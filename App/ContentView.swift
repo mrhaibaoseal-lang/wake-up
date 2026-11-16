@@ -4,12 +4,25 @@ struct ContentView: View {
     @Environment(AppModel.self) private var model
     @State private var customTime = Date().addingTimeInterval(600)
     @State private var confirmRegenerate = false
+    @State private var shownPasscode: String?
 
     var body: some View {
         @Bindable var model = model
+        ZStack {
         NavigationStack {
             List {
+                if model.state.phase == .verified, let code = model.state.guidedPasscode {
+                    Section("引導使用模式密碼") {
+                        Text(code)
+                            .font(.system(size: 48, weight: .bold, design: .monospaced))
+                            .frame(maxWidth: .infinity)
+                        Text("連按三下側邊按鈕，輸入這組密碼，再按左上角「結束」。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+
                 Section("狀態") {
+                    LabeledContent("引導使用模式", value: model.guidedAccessOn ? "✅ 已開啟" : "未開啟")
                     LabeledContent("階段", value: model.state.phase.title)
                     LabeledContent("按停止被重排", value: "\(model.state.rearmCount) 次")
                     LabeledContent("AlarmKit 權限", value: model.authState)
@@ -53,6 +66,17 @@ struct ContentView: View {
                     Text("解鎖")
                 } footer: {
                     Text("上膛中無法修改設定或重置；要解除只能掃浴室的 QR Code（或 NFC）。")
+                }
+
+                Section {
+                    Button(model.state.guidedPasscode == nil ? "產生引導模式密碼" : "換一組引導模式密碼") {
+                        shownPasscode = model.generateGuidedPasscode()
+                    }
+                    .disabled(model.locked)
+                } header: {
+                    Text("引導使用模式")
+                } footer: {
+                    Text("密碼只在產生時顯示一次，之後要掃 QR 成功才會再出現。睡前流程：上膛 → 連按三下側邊按鈕 → 開始。")
                 }
 
                 Section("實驗參數") {
@@ -116,6 +140,11 @@ struct ContentView: View {
                          : "測試時鬧鐘停不下來就按這裡。")
                 }
             }
+            .alert("引導模式密碼", isPresented: Binding(get: { shownPasscode != nil }, set: { if !$0 { shownPasscode = nil } })) {
+                Button("我已經設定好了") { shownPasscode = nil }
+            } message: {
+                Text("\(shownPasscode ?? "")\n\n現在到 設定 > 輔助使用 > 引導使用模式 > 密碼設定，把密碼改成這組（Face ID 要關）。不要背它，關掉這個視窗後要掃 QR 才看得到。")
+            }
             .navigationTitle("起床 PoC")
             .refreshable { model.refresh() }
             .sheet(isPresented: $model.showQRScanner, onDismiss: { model.scannerDismissed() }) {
@@ -129,6 +158,10 @@ struct ContentView: View {
                     model.generateQRToken()
                     model.showQRCode = true
                 }
+            }
+        }
+            if model.locked && !model.showQRScanner {
+                ArmedView()
             }
         }
     }

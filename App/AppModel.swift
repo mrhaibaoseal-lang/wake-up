@@ -15,6 +15,14 @@ final class AppModel {
 
     /// 上膛中（任務未完成）鎖住設定與重置，避免半夢半醒的自己關掉
     var locked: Bool { state.phase.missionPending }
+    var guidedAccessOn = UIAccessibility.isGuidedAccessEnabled
+
+    func generateGuidedPasscode() -> String {
+        let code = String(format: "%06d", Int.random(in: 0...999_999))
+        state = Store.update { $0.guidedPasscode = code }
+        Log.write("🔐 產生新的引導模式密碼")
+        return code
+    }
 
     @ObservationIgnored private var registerMode = false
     @ObservationIgnored private let scanner = NFCScanner()
@@ -87,7 +95,16 @@ final class AppModel {
 
         // 時間到了還沒掃碼：App 自己播警報聲。掃描緩衝中（phase = buffer）暫停。
         let due = latest.alarmDate.map { $0 <= Date() } ?? false
-        KeepAlive.shared.setSiren(latest.sirenEnabled && latest.phase == .armed && due)
+        let sirenOn = latest.sirenEnabled && latest.phase == .armed && due
+        KeepAlive.shared.setSiren(sirenOn)
+        if sirenOn { VolumeForcer.setMax() }
+
+        let guided = UIAccessibility.isGuidedAccessEnabled
+        if guided != guidedAccessOn {
+            guidedAccessOn = guided
+            Log.write(guided ? "🔒 引導使用模式：開" : "🔓 引導使用模式：關")
+        }
+        if state.phase != latest.phase { state = latest }
 
         guard latest.phase.missionPending, latest.refreshSeconds > 0,
               !showQRScanner, !scanning, !refreshing else {
