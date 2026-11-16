@@ -69,7 +69,11 @@ struct ArmedView: View {
                 ScreenDimmer.set(level)
             }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = model.state.keepScreenOn }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = model.state.keepScreenOn
+            // 剛上膛先亮 15 秒，提醒有沒有開引導使用模式；之後自己變全黑（避免烙印）
+            revealUntil = Date().addingTimeInterval(15)
+        }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             ScreenDimmer.restore()
