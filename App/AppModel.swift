@@ -146,7 +146,13 @@ final class AppModel {
     func handleQR(_ payload: String) {
         showQRScanner = false
         guard let token = state.qrToken else {
-            Log.write("❌ 還沒產生 QR Code")
+            // App 資料遺失（刪掉重裝、換憑證）時，掃已經印好的那張就能恢復
+            if payload.hasPrefix("WAKEUP-") {
+                state = Store.update { $0.qrToken = payload }
+                Log.write("♻️ 從紙本 QR Code 恢復")
+            } else {
+                Log.write("❌ 這不是起床 App 的 QR Code")
+            }
             return
         }
         if payload == token {

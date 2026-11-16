@@ -40,6 +40,7 @@ struct ContentView: View {
                             model.generateQRToken()
                             model.showQRCode = true
                         }
+                        Button("已經印好了？掃描紙本恢復") { model.showQRScanner = true }
                     } else {
                         Button("顯示 QR Code（列印用）") { model.showQRCode = true }
                             .disabled(model.locked)
