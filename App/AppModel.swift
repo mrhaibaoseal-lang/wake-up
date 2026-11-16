@@ -218,6 +218,7 @@ final class AppModel {
                 $0.pendingScan = false
                 $0.alarmDate = Date().addingTimeInterval(seconds)
             }
+            SleepStore.startNight(armedAt: Date(), alarmAt: state.alarmDate ?? Date().addingTimeInterval(seconds))
             await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
             refresh()
         }
@@ -246,6 +247,7 @@ final class AppModel {
             $0.pendingScan = false
         }
         AlarmController.disarm(reason: "手動重置")
+        SleepStore.discardPending()
         NotificationBurst.clear()
         refresh()
     }
@@ -294,6 +296,7 @@ final class AppModel {
             $0.pendingScan = false
             $0.verifiedAt = Date()
         }
+        SleepStore.finishNight(verifiedAt: state.verifiedAt ?? Date(), rearmCount: state.rearmCount)
         AlarmController.disarm(reason: "\(source) 驗證成功")
         NotificationBurst.clear()
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")

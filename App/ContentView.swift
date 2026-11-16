@@ -88,11 +88,40 @@ struct ContentView: View {
     @State private var alarmTime = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var confirmRegenerate = false
     @State private var shownPasscode: String?
+    @State private var tab = AppTab.alarm
+
+    enum AppTab: Hashable { case alarm, sleep }
 
     var body: some View {
-        @Bindable var model = model
         ZStack {
-            NavigationStack {
+            TabView(selection: $tab) {
+                alarmTab
+                    .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
+                    .tabItem { Label("鬧鐘", systemImage: "alarm.fill") }
+                    .tag(AppTab.alarm)
+                SleepView()
+                    .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
+                    .tabItem { Label("睡眠", systemImage: "bed.double.fill") }
+                    .tag(AppTab.sleep)
+            }
+            .tint(.wakeAccent)
+
+            // 上膛／響鈴畫面蓋在分頁列之上：分頁列不能變成逃生口
+            if model.locked && !model.showQRScanner {
+                ArmedView()
+                    .ignoresSafeArea()
+                    .zIndex(1)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onChange(of: model.locked, initial: true) { _, locked in
+            if locked { tab = .alarm }
+        }
+    }
+
+    private var alarmTab: some View {
+        @Bindable var model = model
+        return NavigationStack {
                 ScrollView {
                     VStack(spacing: 16) {
                         header
@@ -134,12 +163,6 @@ struct ContentView: View {
                 }
             }
             .tint(.wakeAccent)
-
-            if model.locked && !model.showQRScanner {
-                ArmedView()
-            }
-        }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: 區塊

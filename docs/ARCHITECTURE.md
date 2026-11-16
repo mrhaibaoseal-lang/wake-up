@@ -37,6 +37,10 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 
 小工具讀不到 `embedded.mobileprovision`，也不該自己問 AlarmKit 權限，所以 App 在 `refresh()`（進前景、上膛後）把 `alarmAuthorized`、`profileExpiration` 寫進 `PoCState`（有變才寫）。`verifiedAt` 在掃碼成功時寫入，小工具用它判斷「今天起床了」。小工具的 timeline 另放一個 entry 在 `alarmDate`，到點自己變成橘色的響鈴中；即時動態的已響時間用 `WakeMetadata.ringingSince`（上膛時的 `alarmDate`），刷新換新鬧鐘也不會歸零。
 
+### 睡眠紀錄
+
+上膛時 `SleepStore.startNight`（`armedAt` = 按上膛的時間當作上床）；掃碼成功 `finishNight` 補 `verifiedAt` 與被關次數；手動重置刪掉沒驗證的那筆。時數 = `verifiedAt − armedAt`，1～16 小時之外不計（快速測試也就不會算進去，起床速度同樣只算有效的晚上）。歸屬到 `verifiedAt` 那天，一週從週一開始。
+
 **安全底線**：小工具、即時動態、控制中心都只能看或打開 App（`wakeup://open`），不能停止、解除、延後。
 
 ### 排程的關鍵機制
@@ -55,7 +59,9 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `Shared/AlarmSupport.swift` | `AlarmController`（排程、取消、世代、解除）、`StopAlarmIntent`、`GoScanIntent` |
 | `App/WakeUpApp.swift` | App 入口、`AppDelegate`、前景／背景切換 |
 | `App/AppModel.swift` | 主要邏輯：上膛、刷新迴圈（每 2 秒）、保活與警報聲開關、引導模式偵測、掃描緩衝、驗證、QR、NFC |
-| `App/ContentView.swift` | 主畫面（卡片式）、進階設定 `AdvancedView`、記錄 `LogView` |
+| `App/ContentView.swift` | 底部分頁（鬧鐘／睡眠）、主畫面（卡片式）、進階設定 `AdvancedView`、記錄 `LogView`。上膛中 `ArmedView` 蓋在分頁列之上、分頁列隱藏並切回鬧鐘頁 |
+| `App/SleepStore.swift` | `NightRecord`、`SleepStore`（App Group 的 `nights.json`，留 60 天）、`SleepStats`（本週時數、每天長條、起床速度、連續天數） |
+| `App/SleepView.swift` | 「睡眠」分頁（Swift Charts）。睡眠資料只在 App，不放小工具 |
 | `App/ArmedView.swift` | 上膛後蓋住整個畫面：全黑夜間畫面／響鈴畫面；`VolumeForcer`、`ScreenDimmer` |
 | `App/KeepAlive.swift` | 音訊引擎：無聲保活、警報聲播放、中斷恢復 |
 | `App/QRSupport.swift` | 產生 QR 圖片、VisionKit 掃描器、QR 顯示頁 |
