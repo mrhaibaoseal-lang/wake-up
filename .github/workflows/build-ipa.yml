@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# 新的 push 進來就取消還在跑的舊編譯，避免舊版蓋掉新版
+concurrency:
+  group: build-ipa
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-26
@@ -110,8 +115,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete poc-latest -y --cleanup-tag || true
-          gh release create poc-latest out/WakeUp-unsigned.ipa out/source.json out/icon.png \
-            --prerelease --target "$GITHUB_SHA" \
-            --title "PoC 最新版（build ${{ github.run_number }}）" \
-            --notes "未簽名 IPA，用 Feather 簽名安裝。commit ${GITHUB_SHA::7}"
+          TITLE="PoC 最新版（build ${{ github.run_number }}）"
+          NOTES="未簽名 IPA，用 Feather 簽名安裝。commit ${GITHUB_SHA::7}"
+          FILES="out/WakeUp-unsigned.ipa out/source.json out/icon.png"
+          # 不先刪除：已存在就覆蓋檔案，下載網址不會有空窗
+          for attempt in 1 2 3 4; do
+            if gh release view poc-latest >/dev/null 2>&1; then
+              gh release upload poc-latest $FILES --clobber \
+                && gh release edit poc-latest --title "$TITLE" --notes "$NOTES" --prerelease \
+                && exit 0
+            else
+              gh release create poc-latest $FILES --prerelease --target "$GITHUB_SHA" \
+                --title "$TITLE" --notes "$NOTES" && exit 0
+            fi
+            echo "發佈失敗，第 $attempt 次，等待後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1
