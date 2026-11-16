@@ -327,6 +327,15 @@ struct AdvancedView: View {
             .disabled(model.locked)
 
             Section {
+                Toggle("上膛後保持螢幕亮著", isOn: model.binding(\.keepScreenOn))
+            } header: {
+                Text("螢幕")
+            } footer: {
+                Text("開：螢幕不會自動熄滅（全黑畫面）。關：跟隨系統或引導使用模式的「螢幕自動鎖定」時間熄滅。夜間畫面一律全黑，點一下螢幕顯示資訊 8 秒。")
+            }
+            .disabled(model.locked)
+
+            Section {
                 Picker("解鎖方式", selection: model.binding(\.unlockMethod)) {
                     Text("QR Code").tag(UnlockMethod.qr)
                     Text("NFC 標籤").tag(UnlockMethod.nfc)

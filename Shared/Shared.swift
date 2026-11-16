@@ -168,6 +168,7 @@ struct PoCState: Codable {
     var nfcWhitelist: [String] = []
     var unlockMethod: UnlockMethod = .qr
     var qrToken: String? = nil
+    var keepScreenOn: Bool = true     // 上膛後禁止自動鎖定（關掉才能用引導模式的「螢幕自動鎖定」）
     var scanLocation: String = "客廳"   // QR Code 貼的位置（只用於顯示文字）
     var guidedPasscode: String? = nil  // 引導使用模式密碼：上膛中隱藏，掃碼成功後才顯示
     var chainSeconds: Int = 120  // 保底鬧鐘間隔（鬧鐘疊在一起會只剩震動，所以預設只排 1 顆）
@@ -196,6 +197,7 @@ struct PoCState: Codable {
         qrToken = try c.decodeIfPresent(String.self, forKey: .qrToken)
         guidedPasscode = try c.decodeIfPresent(String.self, forKey: .guidedPasscode)
         scanLocation = try c.decodeIfPresent(String.self, forKey: .scanLocation) ?? d.scanLocation
+        keepScreenOn = try c.decodeIfPresent(Bool.self, forKey: .keepScreenOn) ?? d.keepScreenOn
         chainSeconds = try c.decodeIfPresent(Int.self, forKey: .chainSeconds) ?? d.chainSeconds
         chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
         sequenceGeneration = try c.decodeIfPresent(Int.self, forKey: .sequenceGeneration) ?? d.sequenceGeneration

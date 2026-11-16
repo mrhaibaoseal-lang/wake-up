@@ -69,7 +69,7 @@ struct ArmedView: View {
                 ScreenDimmer.set(level)
             }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = model.state.keepScreenOn }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             ScreenDimmer.restore()
@@ -112,18 +112,8 @@ struct ArmedView: View {
         }
     }
 
-    /// 全黑＋很暗的小時鐘；每分鐘換位置避免烙印
+    /// 全黑：不畫任何東西，避免 OLED 烙印。點一下螢幕會顯示 8 秒資訊。
     private func night(now: Date) -> some View {
-        let minute = Calendar.current.component(.minute, from: now)
-        let dx = CGFloat((minute * 37) % 120) - 60
-        let dy = CGFloat((minute * 53) % 300) - 150
-        return VStack(spacing: 6) {
-            Text(now, style: .time).font(.system(size: 28, weight: .light))
-            if !model.guidedAccessOn {
-                Text("⚠️ 連按三下側鍵開引導模式").font(.caption2)
-            }
-        }
-        .foregroundStyle(Color(white: model.guidedAccessOn ? 0.18 : 0.5))
-        .offset(x: dx, y: dy)
+        Color.black
     }
 }
