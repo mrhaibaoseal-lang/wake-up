@@ -18,7 +18,11 @@ final class AppModel {
     var guidedAccessOn = UIAccessibility.isGuidedAccessEnabled
 
     func generateGuidedPasscode() -> String {
-        let code = String(format: "%06d", Int.random(in: 0...999_999))
+        // 引導使用模式密碼是 4 位數；避開 0000、1234 這類好猜的
+        var code = ""
+        repeat {
+            code = String(format: "%04d", Int.random(in: 0...9_999))
+        } while Set(code).count < 3 || "0123456789 9876543210".contains(code)
         state = Store.update { $0.guidedPasscode = code }
         Log.write("🔐 產生新的引導模式密碼")
         return code
