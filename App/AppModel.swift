@@ -10,6 +10,11 @@ final class AppModel {
     var authState = "未知"
     var lastUID = "—"
     var scanning = false
+    var showQRScanner = false
+    var showQRCode = false
+
+    /// 上膛中（任務未完成）鎖住設定與重置，避免半夢半醒的自己關掉
+    var locked: Bool { state.phase.missionPending }
 
     @ObservationIgnored private var registerMode = false
     @ObservationIgnored private let scanner = NFCScanner()
@@ -46,7 +51,7 @@ final class AppModel {
         Log.write("👀 進前景 phase=\(state.phase.rawValue) 系統內鬧鐘 \(alarms.count) 顆 [\(list)]")
         if state.pendingScan {
             state = Store.update { $0.pendingScan = false }
-            startScan()
+            beginUnlock()
         }
     }
 
@@ -94,6 +99,10 @@ final class AppModel {
     }
 
     func resetAll() {
+        guard !locked else {
+            Log.write("⛔️ 上膛中不能重置")
+            return
+        }
         // 先改狀態，避免正在執行的 stopIntent 又重排
         state = Store.update {
             $0.phase = .idle
@@ -101,6 +110,50 @@ final class AppModel {
         }
         AlarmController.cancelAll(reason: "手動重置")
         refresh()
+    }
+
+    // MARK: 解鎖
+
+    func beginUnlock() {
+        switch state.unlockMethod {
+        case .qr: showQRScanner = true
+        case .nfc: startScan()
+        }
+    }
+
+    private func verifySuccess(source: String) {
+        guard state.phase.missionPending else {
+            Log.write("✅ \(source) 正確（目前未上膛，只是測試）")
+            return
+        }
+        state = Store.update {
+            $0.phase = .verified
+            $0.pendingScan = false
+        }
+        AlarmController.cancelAll(reason: "\(source) 驗證成功")
+        Log.write("✅ \(source) 驗證成功，鬧鐘解除")
+        refresh()
+    }
+
+    // MARK: QR
+
+    func generateQRToken() {
+        let token = "WAKEUP-" + UUID().uuidString
+        state = Store.update { $0.qrToken = token }
+        Log.write("🔳 產生新的 QR Code")
+    }
+
+    func handleQR(_ payload: String) {
+        showQRScanner = false
+        guard let token = state.qrToken else {
+            Log.write("❌ 還沒產生 QR Code")
+            return
+        }
+        if payload == token {
+            verifySuccess(source: "QR")
+        } else {
+            Log.write("❌ QR 內容不符")
+        }
     }
 
     // MARK: NFC
@@ -127,12 +180,7 @@ final class AppModel {
                 }
                 Log.write("🏷️ 登錄標籤 \(uid)")
             } else if state.nfcWhitelist.contains(uid) {
-                state = Store.update {
-                    $0.phase = .verified
-                    $0.pendingScan = false
-                }
-                AlarmController.cancelAll(reason: "NFC 驗證成功")
-                Log.write("✅ 標籤 \(uid) 驗證成功")
+                verifySuccess(source: "NFC 標籤 \(uid)")
             } else {
                 Log.write("❌ 標籤 \(uid) 不在白名單")
             }

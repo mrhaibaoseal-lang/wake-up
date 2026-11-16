@@ -121,6 +121,11 @@ enum Phase: String, Codable {
     var missionPending: Bool { self == .armed || self == .buffer }
 }
 
+enum UnlockMethod: String, Codable {
+    case qr
+    case nfc
+}
+
 struct PoCState: Codable {
     var phase: Phase = .idle
     var rearmCount: Int = 0
@@ -130,7 +135,28 @@ struct PoCState: Codable {
     var callStopInIntent: Bool = true
     var pendingScan: Bool = false
     var nfcWhitelist: [String] = []
+    var unlockMethod: UnlockMethod = .qr
+    var qrToken: String? = nil
     var lastUpdated: Date = Date()
+
+    init() {}
+
+    // 新增欄位時舊資料仍可讀（缺的欄位用預設值），避免白名單被清掉
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = PoCState()
+        phase = try c.decodeIfPresent(Phase.self, forKey: .phase) ?? d.phase
+        rearmCount = try c.decodeIfPresent(Int.self, forKey: .rearmCount) ?? d.rearmCount
+        rearmSeconds = try c.decodeIfPresent(Int.self, forKey: .rearmSeconds) ?? d.rearmSeconds
+        bufferSeconds = try c.decodeIfPresent(Int.self, forKey: .bufferSeconds) ?? d.bufferSeconds
+        stopRearmEnabled = try c.decodeIfPresent(Bool.self, forKey: .stopRearmEnabled) ?? d.stopRearmEnabled
+        callStopInIntent = try c.decodeIfPresent(Bool.self, forKey: .callStopInIntent) ?? d.callStopInIntent
+        pendingScan = try c.decodeIfPresent(Bool.self, forKey: .pendingScan) ?? d.pendingScan
+        nfcWhitelist = try c.decodeIfPresent([String].self, forKey: .nfcWhitelist) ?? d.nfcWhitelist
+        unlockMethod = try c.decodeIfPresent(UnlockMethod.self, forKey: .unlockMethod) ?? d.unlockMethod
+        qrToken = try c.decodeIfPresent(String.self, forKey: .qrToken)
+        lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
+    }
 }
 
 enum Store {

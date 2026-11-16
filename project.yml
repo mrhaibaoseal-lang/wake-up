@@ -26,6 +26,8 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: 用來在指定時間發出無法被輕易關閉的起床鬧鐘。
         NFCReaderUsageDescription: 掃描貼在浴室的 NFC 標籤來解除鬧鐘。
+        NSCameraUsageDescription: 掃描貼在浴室的 QR Code 來解除鬧鐘。
+        NSPhotoLibraryAddUsageDescription: 把你的解鎖 QR Code 存到相簿，拿去列印。
         com.apple.developer.nfc.readersession.iso7816.select-identifiers: [D2760000850101]
         NSSupportsLiveActivities: true
     entitlements:

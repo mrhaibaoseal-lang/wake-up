@@ -38,7 +38,7 @@ enum AlarmController {
         let stopButton = AlarmButton(text: "停止", textColor: .white, systemImageName: "stop.fill")
         let scanButton = AlarmButton(text: "去掃描", textColor: .white, systemImageName: "figure.walk")
         let alert = AlarmPresentation.Alert(
-            title: "起床！去浴室掃標籤",
+            title: "起床！去浴室掃碼",
             stopButton: stopButton,
             secondaryButton: scanButton,
             secondaryButtonBehavior: .custom
@@ -108,7 +108,7 @@ struct StopAlarmIntent: LiveActivityIntent {
     }
 }
 
-/// 按「去掃描」：停掉這次響鈴、排緩衝鬧鐘、打開 App 自動開始 NFC 掃描。
+/// 按「去掃描」：停掉這次響鈴、排緩衝鬧鐘、打開 App 自動開始掃描（QR 或 NFC）。
 struct GoScanIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "去掃描"
     static var isDiscoverable: Bool = false
