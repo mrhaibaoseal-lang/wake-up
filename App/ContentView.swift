@@ -303,6 +303,36 @@ struct ContentView: View {
             }
             .disabled(model.locked)
 
+            Divider().padding(.leading, 40)
+
+            HStack(spacing: 12) {
+                Image(systemName: "moon.zzz.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.wakeAccent)
+                    .frame(width: 28)
+                Toggle("睡前提醒", isOn: Binding(
+                    get: { model.state.bedtimeReminderOn },
+                    set: { model.setBedtimeReminder(on: $0) }
+                ))
+            }
+            .padding(.vertical, 6)
+            .disabled(model.locked)
+
+            if model.state.bedtimeReminderOn {
+                HStack(spacing: 12) {
+                    Color.clear.frame(width: 28, height: 1)
+                    Text("提醒時間").foregroundStyle(.secondary)
+                    Spacer()
+                    DatePicker("", selection: Binding(
+                        get: { model.bedtimeDate },
+                        set: { model.setBedtime($0) }
+                    ), displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                }
+                .padding(.vertical, 4)
+                .disabled(model.locked)
+            }
+
             if model.state.qrToken != nil {
                 Divider().padding(.leading, 40)
                 Button { confirmRegenerate = true } label: {

@@ -95,6 +95,27 @@ final class AppModel {
         }
         checkPendingScan()
         startPendingWatchers()
+        BedtimeReminder.reschedule()
+    }
+
+    // MARK: 睡前提醒
+
+    var bedtimeDate: Date {
+        Calendar.current.date(bySettingHour: state.bedtimeMinutes / 60, minute: state.bedtimeMinutes % 60,
+                              second: 0, of: Date()) ?? Date()
+    }
+
+    func setBedtimeReminder(on: Bool) {
+        state = Store.update { $0.bedtimeReminderOn = on }
+        BedtimeReminder.reschedule()
+    }
+
+    func setBedtime(_ date: Date) {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let minutes = (parts.hour ?? 23) * 60 + (parts.minute ?? 30)
+        guard minutes != state.bedtimeMinutes else { return }
+        state = Store.update { $0.bedtimeMinutes = minutes }
+        BedtimeReminder.reschedule()
     }
 
     // MARK: 刷新：響了 N 秒還沒解除，就取消它、1 秒後換一顆新的（新的才有聲音）
@@ -210,18 +231,27 @@ final class AppModel {
 
     func arm(after seconds: TimeInterval) {
         Task {
-            guard await AlarmController.ensureAuthorized() else { refresh(); return }
-            NotificationBurst.requestAuthorization()
-            state = Store.update {
-                $0.phase = .armed
-                $0.rearmCount = 0
-                $0.pendingScan = false
-                $0.alarmDate = Date().addingTimeInterval(seconds)
-            }
-            SleepStore.startNight(armedAt: Date(), alarmAt: state.alarmDate ?? Date().addingTimeInterval(seconds))
-            await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
+            _ = await Self.performArm(after: seconds, source: "App")
             refresh()
         }
+    }
+
+    /// 上膛本體：App 按鈕與捷徑／Siri 共用。呼叫端要自己先確認不在 missionPending。
+    @discardableResult
+    static func performArm(after seconds: TimeInterval, source: String) async -> Bool {
+        guard await AlarmController.ensureAuthorized() else { return false }
+        NotificationBurst.requestAuthorization()
+        let armed = Store.update {
+            $0.phase = .armed
+            $0.rearmCount = 0
+            $0.pendingScan = false
+            $0.alarmDate = Date().addingTimeInterval(seconds)
+        }
+        Log.write("🎯 上膛（\(source)）")
+        SleepStore.startNight(armedAt: Date(), alarmAt: armed.alarmDate ?? Date().addingTimeInterval(seconds))
+        await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
+        await BedtimeReminder.rescheduleNow()
+        return true
     }
 
     /// 下一個符合「時:分」的時間（至少 5 秒後）
@@ -249,6 +279,7 @@ final class AppModel {
         AlarmController.disarm(reason: "手動重置")
         SleepStore.discardPending()
         NotificationBurst.clear()
+        BedtimeReminder.reschedule()  // clear() 會清掉全部通知，所以放在它後面
         refresh()
     }
 
@@ -299,6 +330,7 @@ final class AppModel {
         SleepStore.finishNight(verifiedAt: state.verifiedAt ?? Date(), rearmCount: state.rearmCount)
         AlarmController.disarm(reason: "\(source) 驗證成功")
         NotificationBurst.clear()
+        BedtimeReminder.reschedule()
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
     }

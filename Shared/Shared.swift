@@ -181,6 +181,8 @@ struct PoCState: Codable {
     var verifiedAt: Date? = nil       // 最近一次掃碼驗證成功的時間（小工具顯示「今天起床了」）
     var alarmAuthorized: Bool = false // App 存下的鬧鐘權限結果（小工具自己讀不到）
     var profileExpiration: Date? = nil // App 存下的憑證到期日（小工具讀不到 embedded.mobileprovision）
+    var bedtimeReminderOn: Bool = true  // 睡前提醒「今晚還沒上膛」
+    var bedtimeMinutes: Int = 23 * 60 + 30 // 睡前提醒時間（一天中的第幾分鐘），預設 23:30
     var lastUpdated: Date = Date()
 
     init() {}
@@ -212,6 +214,8 @@ struct PoCState: Codable {
         verifiedAt = try c.decodeIfPresent(Date.self, forKey: .verifiedAt)
         alarmAuthorized = try c.decodeIfPresent(Bool.self, forKey: .alarmAuthorized) ?? d.alarmAuthorized
         profileExpiration = try c.decodeIfPresent(Date.self, forKey: .profileExpiration)
+        bedtimeReminderOn = try c.decodeIfPresent(Bool.self, forKey: .bedtimeReminderOn) ?? d.bedtimeReminderOn
+        bedtimeMinutes = try c.decodeIfPresent(Int.self, forKey: .bedtimeMinutes) ?? d.bedtimeMinutes
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }
