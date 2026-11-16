@@ -137,8 +137,8 @@ struct PoCState: Codable {
     var nfcWhitelist: [String] = []
     var unlockMethod: UnlockMethod = .qr
     var qrToken: String? = nil
-    var chainSeconds: Int = 30   // 保底鬧鐘間隔
-    var chainCount: Int = 40     // 保底鬧鐘顆數（30s × 40 = 20 分鐘）
+    var chainSeconds: Int = 10   // 保底鬧鐘間隔
+    var chainCount: Int = 90     // 保底鬧鐘顆數（10s × 90 = 15 分鐘）
     var lastUpdated: Date = Date()
 
     init() {}
