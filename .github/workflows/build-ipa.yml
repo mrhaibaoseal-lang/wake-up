@@ -1,0 +1,46 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: ["claude/**", "main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build (no code signing)
+        run: |
+          xcodebuild -project WakeUp.xcodeproj -target WakeUp \
+            -configuration Release -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Release-iphoneos/WakeUp.app out/Payload/
+          ls out/Payload/WakeUp.app/PlugIns || echo "⚠️ no PlugIns"
+          cd out && zip -qry WakeUp-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WakeUp-unsigned-ipa
+          path: out/WakeUp-unsigned.ipa
+          retention-days: 14
