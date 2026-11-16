@@ -17,7 +17,7 @@ final class NFCScanner: NSObject, NFCTagReaderSessionDelegate {
         }
         self.completion = completion
         session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693], delegate: self, queue: nil)
-        session?.alertMessage = "把手機靠近浴室的標籤"
+        session?.alertMessage = "把手機靠近標籤"
         session?.begin()
     }
 

@@ -149,6 +149,7 @@ enum Phase: String, Codable {
 
     /// 任務還沒完成：按停止要重排
     var missionPending: Bool { self == .armed || self == .buffer }
+
 }
 
 enum UnlockMethod: String, Codable {
@@ -167,6 +168,7 @@ struct PoCState: Codable {
     var nfcWhitelist: [String] = []
     var unlockMethod: UnlockMethod = .qr
     var qrToken: String? = nil
+    var scanLocation: String = "客廳"   // QR Code 貼的位置（只用於顯示文字）
     var guidedPasscode: String? = nil  // 引導使用模式密碼：上膛中隱藏，掃碼成功後才顯示
     var chainSeconds: Int = 120  // 保底鬧鐘間隔（鬧鐘疊在一起會只剩震動，所以預設只排 1 顆）
     var chainCount: Int = 1      // 保底鬧鐘顆數
@@ -193,6 +195,7 @@ struct PoCState: Codable {
         unlockMethod = try c.decodeIfPresent(UnlockMethod.self, forKey: .unlockMethod) ?? d.unlockMethod
         qrToken = try c.decodeIfPresent(String.self, forKey: .qrToken)
         guidedPasscode = try c.decodeIfPresent(String.self, forKey: .guidedPasscode)
+        scanLocation = try c.decodeIfPresent(String.self, forKey: .scanLocation) ?? d.scanLocation
         chainSeconds = try c.decodeIfPresent(Int.self, forKey: .chainSeconds) ?? d.chainSeconds
         chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
         sequenceGeneration = try c.decodeIfPresent(Int.self, forKey: .sequenceGeneration) ?? d.sequenceGeneration

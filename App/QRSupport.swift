@@ -88,7 +88,7 @@ struct QRScannerSheet: View {
                     Text("這台裝置不支援 QR 掃描").padding()
                 }
             }
-            .navigationTitle("掃浴室的 QR Code")
+            .navigationTitle("掃\(model.state.scanLocation)的 QR Code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

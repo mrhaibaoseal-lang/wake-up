@@ -47,7 +47,7 @@ enum NotificationBurst {
         for i in 0..<count {
             let content = UNMutableNotificationContent()
             content.title = "起床！鬧鐘 App 被關掉了"
-            content.body = "去浴室掃 QR Code 才會停"
+            content.body = "去\(Store.load().scanLocation)掃 QR Code 才會停"
             content.sound = .default
             content.interruptionLevel = .timeSensitive
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3 + Double(i) * interval, repeats: false)

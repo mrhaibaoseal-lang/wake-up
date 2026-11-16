@@ -4,15 +4,22 @@
 
 目前是 **PoC（原型）**，只用來驗證三個風險最高的假設。
 
-## 取得 IPA
+## 安裝與更新
 
-1. 每次 push，GitHub Actions 會自動編出**未簽名**的 IPA，並更新到 Release `poc-latest`。
-2. 手機直接下載（固定網址，不用登入）：
-   https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/WakeUp-unsigned.ipa
-   也可以把這個網址貼進 Feather 的「從網址匯入」。
-3. 用 **Feather** 選 Flarestore 的 .p12 + profile 簽名安裝。
-   - **不要**勾「移除擴充功能 / Remove PlugIns」，小工具要用。
-   - Bundle ID 保持 `app.calcite3909.scorpio3556`（不需要改）。
+**推薦：Feather 來源（自動通知更新）**
+在 Feather 新增來源：
+`https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/source.json`
+
+**或直接下載 IPA（固定網址）**
+https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/WakeUp-unsigned.ipa
+
+用 Feather 選 Flarestore 的 .p12 + profile 簽名安裝。不要勾「移除 PlugIns」，Bundle ID 保持 `app.calcite3909.scorpio3556`。
+每次 push 都會由 GitHub Actions 重新編譯並更新上面兩個網址（版本號 1.0.<build>）。
+
+## 每天的用法
+
+1. 睡前：選時間 → 上膛 → 連按三下側邊按鈕開始引導使用模式 → 插電
+2. 早上：走到 QR Code 的位置（預設客廳）掃碼 → 畫面顯示引導模式密碼 → 連按三下側邊按鈕輸入密碼結束
 
 ## 測試清單
 

@@ -200,10 +200,16 @@ final class AppModel {
         }
     }
 
+    /// 下一個符合「時:分」的時間（至少 5 秒後）
+    static func nextOccurrence(of time: Date) -> Date {
+        let calendar = Calendar.current
+        let parts = calendar.dateComponents([.hour, .minute], from: time)
+        return calendar.nextDate(after: Date().addingTimeInterval(5), matching: parts,
+                                 matchingPolicy: .nextTime) ?? time.addingTimeInterval(86_400)
+    }
+
     func arm(at time: Date) {
-        var interval = time.timeIntervalSinceNow
-        if interval < 5 { interval += 86_400 }
-        arm(after: interval)
+        arm(after: Self.nextOccurrence(of: time).timeIntervalSinceNow)
     }
 
     func resetAll() {

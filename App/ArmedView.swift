@@ -81,7 +81,7 @@ struct ArmedView: View {
     private var ringing: some View {
         VStack(spacing: 28) {
             Text("起床！").font(.system(size: 64, weight: .heavy)).foregroundStyle(.white)
-            Text("去浴室掃 QR Code 才會停").font(.title3).foregroundStyle(.white)
+            Text("去\(model.state.scanLocation)掃 QR Code 才會停").font(.title3).foregroundStyle(.white)
             Button {
                 model.beginUnlock()
             } label: {

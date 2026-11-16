@@ -83,13 +83,13 @@ struct AlarmLiveActivity: Widget {
                 Image(systemName: "alarm.fill")
                 Text("起床鬧鐘").font(.headline)
                 Spacer()
-                Text("去浴室掃碼").font(.caption)
+                Text("去掃碼").font(.caption)
             }
             .padding()
         } dynamicIsland: { _ in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
-                    Text("起床！去浴室掃碼")
+                    Text("起床！去掃碼")
                 }
             } compactLeading: {
                 Image(systemName: "alarm.fill")
