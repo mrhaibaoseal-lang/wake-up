@@ -49,8 +49,7 @@ final class AppModel {
     func onActive() {
         refresh()
         startObserving()
-        let list = alarms.map(AlarmController.describe).joined(separator: ", ")
-        Log.write("👀 進前景 phase=\(state.phase.rawValue) 系統內鬧鐘 \(alarms.count) 顆 [\(list)]")
+        Log.write("👀 進前景 phase=\(state.phase.rawValue) 系統內鬧鐘\(AlarmController.summary(alarms))")
         // 緩衝中打開 App 就直接開掃描
         if state.phase == .buffer && !state.pendingScan {
             beginUnlock()
@@ -94,10 +93,15 @@ final class AppModel {
     private func startObserving() {
         guard observer == nil else { return }
         observer = Task {
+            var lastAlerting = -1
             for await list in AlarmManager.shared.alarmUpdates {
-                let desc = list.map(AlarmController.describe).joined(separator: ", ")
-                Log.write("📡 alarmUpdates [\(desc)]")
                 self.alarms = list
+                // 只在「響鈴中」數量改變時記錄，避免排幾百顆時記錄爆量
+                let alerting = list.filter(AlarmController.isAlerting).count
+                if alerting != lastAlerting {
+                    lastAlerting = alerting
+                    Log.write("📡 \(AlarmController.summary(list))")
+                }
             }
         }
     }

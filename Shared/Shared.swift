@@ -71,15 +71,19 @@ enum Log {
         Bundle.main.bundlePath.hasSuffix(".appex") ? "widget" : "app"
     }
 
+    /// 記錄檔上限；超過就只保留後半段
+    private static let maxBytes = 200_000
+
     static func write(_ message: String) {
         let line = "[\(formatter.string(from: Date()))][\(processTag)] \(message)\n"
         let data = Data(line.utf8)
         queue.sync {
             let url = fileURL
             if let handle = try? FileHandle(forWritingTo: url) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
+                let end = (try? handle.seekToEnd()) ?? 0
                 try? handle.write(contentsOf: data)
+                try? handle.close()
+                if end > UInt64(maxBytes) { trimUnlocked() }
             } else {
                 try? data.write(to: url)
             }
@@ -87,12 +91,38 @@ enum Log {
         print(line, terminator: "")
     }
 
+    private static func trimUnlocked() {
+        guard let data = try? Data(contentsOf: fileURL) else { return }
+        var tail = data.suffix(maxBytes / 2)
+        if let newline = tail.firstIndex(of: UInt8(ascii: "\n")) {
+            tail = tail[tail.index(after: newline)...]
+        }
+        var output = Data("（較舊的記錄已自動刪除）\n".utf8)
+        output.append(tail)
+        try? output.write(to: fileURL, options: .atomic)
+    }
+
     static func readAll() -> String {
         queue.sync { (try? String(contentsOf: fileURL, encoding: .utf8)) ?? "" }
     }
 
+    /// 最後 n 行（給記錄頁顯示用）
+    static func tailLines(_ n: Int) -> [String] {
+        let lines = readAll().split(separator: "\n", omittingEmptySubsequences: true)
+        return lines.suffix(n).map(String.init)
+    }
+
     static func lastLine() -> String {
-        readAll().split(separator: "\n").last.map(String.init) ?? ""
+        queue.sync {
+            guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return "" }
+            defer { try? handle.close() }
+            let size = (try? handle.seekToEnd()) ?? 0
+            let start = size > 4096 ? size - 4096 : 0
+            try? handle.seek(toOffset: start)
+            let data = (try? handle.readToEnd()) ?? Data()
+            let text = String(decoding: data, as: UTF8.self)
+            return text.split(separator: "\n").last.map(String.init) ?? ""
+        }
     }
 
     static func clear() {

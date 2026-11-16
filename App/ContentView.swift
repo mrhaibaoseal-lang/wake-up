@@ -87,9 +87,14 @@ struct ContentView: View {
                 Section("系統內的鬧鐘（AlarmKit）") {
                     if model.alarms.isEmpty {
                         Text("無").foregroundStyle(.secondary)
-                    }
-                    ForEach(model.alarms, id: \.id) { alarm in
-                        Text(AlarmController.describe(alarm)).font(.caption.monospaced())
+                    } else {
+                        Text(AlarmController.summary(model.alarms))
+                        ForEach(Array(model.alarms.prefix(5)), id: \.id) { alarm in
+                            Text(AlarmController.describe(alarm)).font(.caption.monospaced())
+                        }
+                        if model.alarms.count > 5 {
+                            Text("⋯ 其餘 \(model.alarms.count - 5) 顆").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     Button("重新整理") { model.refresh() }
                 }
@@ -126,20 +131,27 @@ struct ContentView: View {
 }
 
 struct LogView: View {
-    @State private var text = ""
+    @State private var lines: [String] = []
 
     var body: some View {
         ScrollView {
-            Text(text.isEmpty ? "（空）" : text)
-                .font(.system(size: 11, design: .monospaced))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+            LazyVStack(alignment: .leading, spacing: 2) {
+                if lines.isEmpty {
+                    Text("（空）").foregroundStyle(.secondary)
+                }
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
         }
-        .navigationTitle("記錄")
+        .navigationTitle("記錄（最後 400 行）")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: text)
+                ShareLink(item: Log.fileURL)
             }
             ToolbarItemGroup(placement: .bottomBar) {
                 Button("清除", role: .destructive) {
@@ -154,6 +166,6 @@ struct LogView: View {
     }
 
     private func load() {
-        text = Log.readAll()
+        lines = Log.tailLines(400)
     }
 }

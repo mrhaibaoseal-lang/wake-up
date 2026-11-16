@@ -94,6 +94,16 @@ enum AlarmController {
     static func describe(_ alarm: Alarm) -> String {
         "\(alarm.id.short) · \(alarm.state)"
     }
+
+    static func isAlerting(_ alarm: Alarm) -> Bool {
+        "\(alarm.state)" == "alerting"
+    }
+
+    /// 例：「共 180 顆（響鈴中 1）」
+    static func summary(_ list: [Alarm]) -> String {
+        let alerting = list.filter(isAlerting).count
+        return alerting > 0 ? "共 \(list.count) 顆（響鈴中 \(alerting)）" : "共 \(list.count) 顆"
+    }
 }
 
 // MARK: - 鬧鐘按鈕的 Intent（系統會在背景喚醒 App 執行）
