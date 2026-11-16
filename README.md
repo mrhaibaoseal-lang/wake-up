@@ -60,13 +60,11 @@ https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/WakeUp
 
 ## 在電腦上取得專案
 
-程式碼在 **`claude/ios-alarm-anti-oversleep-arch-0kfw86`** 分支（`main` 目前只有初始 commit）。
-
-- 下載 zip：https://github.com/mrhaibaoseal-lang/wake-up/archive/refs/heads/claude/ios-alarm-anti-oversleep-arch-0kfw86.zip
+- 下載 zip：https://github.com/mrhaibaoseal-lang/wake-up/archive/refs/heads/main.zip
 - 或用 Git：
 
   ```powershell
-  git clone -b claude/ios-alarm-anti-oversleep-arch-0kfw86 https://github.com/mrhaibaoseal-lang/wake-up.git
+  git clone https://github.com/mrhaibaoseal-lang/wake-up.git
   ```
 
 Windows 無法編譯 iOS App：改完程式後 push，由 GitHub Actions 編譯。

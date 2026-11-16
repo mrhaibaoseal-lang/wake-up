@@ -30,7 +30,7 @@
 | 簽名安裝 | 使用者在手機上用 **Feather** 搭配向第三方（Flarestore）買的 `.p12` + `.mobileprovision` 簽名側載 |
 | 發佈 | CI 把 IPA、`source.json`（Feather / AltStore 來源格式）、`icon.png` 上傳到 GitHub Release `poc-latest`（覆蓋上傳，不刪除） |
 | 版本號 | `MARKETING_VERSION = 1.0.<run_number>`、`CFBundleVersion = <run_number>` |
-| 開發分支 | `claude/ios-alarm-anti-oversleep-arch-0kfw86`（`main` 目前只有初始 commit） |
+| 分支 | `main` 是最新的穩定版；開發在 `claude/ios-alarm-anti-oversleep-arch-0kfw86` 或新分支，完成後合併回 `main`。兩者 push 都會觸發編譯 |
 | Repo | **公開**：`mrhaibaoseal-lang/wake-up` |
 
 ### 固定網址

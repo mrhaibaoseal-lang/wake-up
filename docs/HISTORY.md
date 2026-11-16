@@ -121,4 +121,6 @@
 
 - **電擊手環**：Pavlok 有 API 可串接，但使用者覺得太貴。便宜的藍牙款可能可以逆向（要先用 nRF Connect 看 GATT），遙控器款不能用。尚未進行。
 - **在電腦上繼續**：用 claude.ai/code 打開同一個 session，或 clone repo 在本地跑 Claude Code。
-- **改成本地專案**：clone 分支 `claude/ios-alarm-anti-oversleep-arch-0kfw86`（見 README）。
+- **改成本地專案**：clone repo（見 README）。
+- **合併到 `main`**：使用者要求後，開 PR 把開發分支合併回 `main`，之後 `main` 就是最新版。
+- **交接文件**：使用者準備換其他 AI 接手，新增 `AGENTS.md` 與 `docs/` 下的完整紀錄。
