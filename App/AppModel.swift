@@ -144,7 +144,7 @@ final class AppModel {
             $0.phase = .idle
             $0.pendingScan = false
         }
-        AlarmController.cancelAll(reason: "手動重置")
+        AlarmController.disarm(reason: "手動重置")
         refresh()
     }
 
@@ -152,9 +152,33 @@ final class AppModel {
 
     func beginUnlock() {
         guard !showQRScanner, !scanning else { return }
+        if state.phase.missionPending { startScanBuffer() }
         switch state.unlockMethod {
         case .qr: showQRScanner = true
         case .nfc: startScan()
+        }
+    }
+
+    /// 掃描一打開就先取消全部、緩衝 bufferSeconds，免得響鈴畫面蓋住相機
+    private func startScanBuffer() {
+        let seconds = state.bufferSeconds
+        state = Store.update { $0.phase = .buffer }
+        Log.write("📷 開始掃描，緩衝 \(seconds)s")
+        Task {
+            await AlarmController.scheduleSequence(startIn: TimeInterval(seconds), reason: "掃描緩衝 \(seconds)s 到了")
+            refresh()
+        }
+    }
+
+    /// 關掉相機（或 NFC 失敗）卻沒驗證成功 → 幾秒後恢復響鈴
+    func scannerDismissed() {
+        let latest = Store.load()
+        guard latest.phase.missionPending else { return }
+        state = Store.update { $0.phase = .armed }
+        Log.write("📷 關掉掃描但沒成功 → \(latest.rearmSeconds)s 後恢復響鈴")
+        Task {
+            await AlarmController.scheduleSequence(startIn: TimeInterval(latest.rearmSeconds), reason: "掃描沒成功")
+            refresh()
         }
     }
 
@@ -167,7 +191,7 @@ final class AppModel {
             $0.phase = .verified
             $0.pendingScan = false
         }
-        AlarmController.cancelAll(reason: "\(source) 驗證成功")
+        AlarmController.disarm(reason: "\(source) 驗證成功")
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
     }
@@ -214,6 +238,7 @@ final class AppModel {
         switch result {
         case .failure(let error):
             Log.write("NFC 失敗：\(error.localizedDescription)")
+            scannerDismissed()
         case .success(let uid):
             lastUID = uid
             if registerMode {
@@ -226,6 +251,7 @@ final class AppModel {
                 verifySuccess(source: "NFC 標籤 \(uid)")
             } else {
                 Log.write("❌ 標籤 \(uid) 不在白名單")
+                scannerDismissed()
             }
         }
         refresh()

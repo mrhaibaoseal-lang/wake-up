@@ -169,6 +169,7 @@ struct PoCState: Codable {
     var qrToken: String? = nil
     var chainSeconds: Int = 10   // 保底鬧鐘間隔
     var chainCount: Int = 90     // 保底鬧鐘顆數（10s × 90 = 15 分鐘）
+    var sequenceGeneration: Int = 0  // 每次重排 +1，舊的排程迴圈看到就停
     var lastUpdated: Date = Date()
 
     init() {}
@@ -189,6 +190,7 @@ struct PoCState: Codable {
         qrToken = try c.decodeIfPresent(String.self, forKey: .qrToken)
         chainSeconds = try c.decodeIfPresent(Int.self, forKey: .chainSeconds) ?? d.chainSeconds
         chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
+        sequenceGeneration = try c.decodeIfPresent(Int.self, forKey: .sequenceGeneration) ?? d.sequenceGeneration
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }

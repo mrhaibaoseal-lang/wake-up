@@ -33,12 +33,20 @@ enum AlarmController {
     /// 取消現有的全部鬧鐘，重排一整串：第一顆在 +seconds，之後每 chainSeconds 一顆保底。
     /// 被音量鍵、側鍵等任何方式弄安靜，下一顆保底照響；只有驗證成功能全部取消。
     static func scheduleSequence(startIn seconds: TimeInterval, reason: String) async {
-        let state = Store.load()
+        // 拿一個新編號；之前還在跑的排程迴圈看到編號變了就會停
+        let state = Store.update { $0.sequenceGeneration += 1 }
+        let generation = state.sequenceGeneration
         cancelAll(reason: "重排序列（\(reason)）", log: false)
         let count = max(1, state.chainCount)
         var ok = 0
         var failed = 0
         for i in 0..<count {
+            let latest = Store.load()
+            guard latest.sequenceGeneration == generation, latest.phase.missionPending else {
+                Log.write("⛔️ 排程中止（已解除或有更新的排程），已排 \(ok) 顆")
+                if !latest.phase.missionPending { cancelAll(reason: "中止後清掉已排的", log: false) }
+                return
+            }
             let offset = seconds + TimeInterval(i * state.chainSeconds)
             do {
                 try await schedule(after: offset, reason: reason, log: i == 0)
@@ -80,6 +88,20 @@ enum AlarmController {
         _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
         if log { Log.write("⏰ 排程 \(id.short) 於 \(Log.formatter.string(from: fireDate))（+\(Int(seconds))s）原因：\(reason)") }
         return id
+    }
+
+    /// 驗證成功後：讓排程迴圈全部失效，取消全部，並在幾秒內再補清幾次漏網的
+    static func disarm(reason: String) {
+        Store.update { $0.sequenceGeneration += 1 }
+        cancelAll(reason: reason)
+        Task {
+            for delay in [1, 3, 6] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Store.load().phase.missionPending else { return }
+                let left = (try? AlarmManager.shared.alarms) ?? []
+                if !left.isEmpty { cancelAll(reason: "補清漏網 \(left.count) 顆") }
+            }
+        }
     }
 
     static func cancelAll(reason: String, log: Bool = true) {

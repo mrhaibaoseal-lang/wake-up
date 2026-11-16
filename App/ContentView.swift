@@ -114,7 +114,7 @@ struct ContentView: View {
             }
             .navigationTitle("起床 PoC")
             .refreshable { model.refresh() }
-            .sheet(isPresented: $model.showQRScanner) {
+            .sheet(isPresented: $model.showQRScanner, onDismiss: { model.scannerDismissed() }) {
                 QRScannerSheet()
             }
             .sheet(isPresented: $model.showQRCode) {
