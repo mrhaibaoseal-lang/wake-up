@@ -32,6 +32,9 @@ targets:
         com.apple.developer.nfc.readersession.iso7816.select-identifiers: [D2760000850101]
         NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]
+        CFBundleURLTypes:
+          - CFBundleURLName: wakeup
+            CFBundleURLSchemes: [wakeup]
     entitlements:
       path: App/WakeUp.entitlements
       properties:

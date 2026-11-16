@@ -6,6 +6,10 @@ import AppIntents
 
 struct WakeMetadata: AlarmMetadata {
     var label: String = "wake"
+    /// 掃碼地點（即時動態顯示「去{地點}掃碼」）
+    var location: String? = nil
+    /// 這次上膛第一次響的時間（即時動態顯示已響多久；刷新換新鬧鐘也不會歸零）
+    var ringingSince: Date? = nil
 }
 
 enum AlarmController {
@@ -72,9 +76,10 @@ enum AlarmController {
             secondaryButton: scanButton,
             secondaryButtonBehavior: .custom
         )
+        let current = Store.load()
         let attributes = AlarmAttributes<WakeMetadata>(
             presentation: AlarmPresentation(alert: alert),
-            metadata: WakeMetadata(),
+            metadata: WakeMetadata(location: current.scanLocation, ringingSince: current.alarmDate ?? fireDate),
             tintColor: .red
         )
         let configuration = AlarmManager.AlarmConfiguration<WakeMetadata>(

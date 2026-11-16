@@ -178,6 +178,9 @@ struct PoCState: Codable {
     var sirenEnabled: Bool = true // 時間到後 App 自己播警報聲（按鍵停不掉）
     var alarmDate: Date? = nil    // 這次上膛預定第一次響的時間
     var sequenceGeneration: Int = 0  // 每次重排 +1，舊的排程迴圈看到就停
+    var verifiedAt: Date? = nil       // 最近一次掃碼驗證成功的時間（小工具顯示「今天起床了」）
+    var alarmAuthorized: Bool = false // App 存下的鬧鐘權限結果（小工具自己讀不到）
+    var profileExpiration: Date? = nil // App 存下的憑證到期日（小工具讀不到 embedded.mobileprovision）
     var lastUpdated: Date = Date()
 
     init() {}
@@ -206,6 +209,9 @@ struct PoCState: Codable {
         refreshSeconds = try c.decodeIfPresent(Int.self, forKey: .refreshSeconds) ?? d.refreshSeconds
         sirenEnabled = try c.decodeIfPresent(Bool.self, forKey: .sirenEnabled) ?? d.sirenEnabled
         alarmDate = try c.decodeIfPresent(Date.self, forKey: .alarmDate)
+        verifiedAt = try c.decodeIfPresent(Date.self, forKey: .verifiedAt)
+        alarmAuthorized = try c.decodeIfPresent(Bool.self, forKey: .alarmAuthorized) ?? d.alarmAuthorized
+        profileExpiration = try c.decodeIfPresent(Date.self, forKey: .profileExpiration)
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }

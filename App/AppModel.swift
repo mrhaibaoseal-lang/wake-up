@@ -64,6 +64,25 @@ final class AppModel {
         state = Store.load()
         alarms = (try? AlarmManager.shared.alarms) ?? []
         authState = "\(AlarmManager.shared.authorizationState)"
+        syncWidgetInfo()
+    }
+
+    /// 小工具讀不到鬧鐘權限和憑證檔，App 把結果存進 state 給它看（有變才寫，避免一直刷新小工具）
+    private func syncWidgetInfo() {
+        let authorized = AlarmManager.shared.authorizationState == .authorized
+        let expiry = ProvisioningInfo.expirationDate
+        let expiryChanged: Bool = {
+            switch (state.profileExpiration, expiry) {
+            case (nil, nil): return false
+            case let (a?, b?): return abs(a.timeIntervalSince(b)) > 1
+            default: return true
+            }
+        }()
+        guard state.alarmAuthorized != authorized || expiryChanged else { return }
+        state = Store.update {
+            $0.alarmAuthorized = authorized
+            $0.profileExpiration = expiry
+        }
     }
 
     func onActive() {
@@ -273,6 +292,7 @@ final class AppModel {
         state = Store.update {
             $0.phase = .verified
             $0.pendingScan = false
+            $0.verifiedAt = Date()
         }
         AlarmController.disarm(reason: "\(source) 驗證成功")
         NotificationBurst.clear()

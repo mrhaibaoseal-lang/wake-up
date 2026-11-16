@@ -33,6 +33,12 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 
 `missionPending = armed || buffer`。
 
+### 給小工具看的欄位
+
+小工具讀不到 `embedded.mobileprovision`，也不該自己問 AlarmKit 權限，所以 App 在 `refresh()`（進前景、上膛後）把 `alarmAuthorized`、`profileExpiration` 寫進 `PoCState`（有變才寫）。`verifiedAt` 在掃碼成功時寫入，小工具用它判斷「今天起床了」。小工具的 timeline 另放一個 entry 在 `alarmDate`，到點自己變成橘色的響鈴中；即時動態的已響時間用 `WakeMetadata.ringingSince`（上膛時的 `alarmDate`），刷新換新鬧鐘也不會歸零。
+
+**安全底線**：小工具、即時動態、控制中心都只能看或打開 App（`wakeup://open`），不能停止、解除、延後。
+
 ### 排程的關鍵機制
 
 - `AlarmController.scheduleSequence(startIn:reason:)`：先取消全部，再排「第一顆在 +N 秒，之後每 `chainSeconds` 一顆，共 `chainCount` 顆」。預設 `chainCount = 1`。
@@ -57,7 +63,8 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `App/TerminationGuard.swift` | App 被滑掉時的備援（實測效果有限）、通知連發 |
 | `App/Sounds/wake_alarm.wav` | 程式合成的刺耳警報音（AlarmKit 與 App 警報聲共用） |
 | `App/Assets.xcassets` | App 圖示 |
-| `Widget/WakeWidgets.swift` | 桌面小工具（顯示狀態）、AlarmKit 的 Live Activity |
+| `Shared/OpenAppIntent.swift` | `OpenWakeAppIntent`：只打開 App（控制中心按鈕用，App 與 Widget 都編進去） |
+| `Widget/WakeWidgets.swift` | 小工具 `StatusWidget`（黑／橘，未上膛／已上膛／響鈴中／今天起床了；小、中、鎖屏三種）、AlarmKit 即時動態與動態島、控制中心按鈕 `WakeControl` |
 
 ## 每天的流程
 
