@@ -30,6 +30,7 @@ targets:
         NSPhotoLibraryAddUsageDescription: 把你的解鎖 QR Code 存到相簿，拿去列印。
         com.apple.developer.nfc.readersession.iso7816.select-identifiers: [D2760000850101]
         NSSupportsLiveActivities: true
+        UIBackgroundModes: [audio]
     entitlements:
       path: App/WakeUp.entitlements
       properties:

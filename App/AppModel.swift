@@ -21,6 +21,14 @@ final class AppModel {
     @ObservationIgnored private var observer: Task<Void, Never>?
     @ObservationIgnored private var pendingWatcher: Task<Void, Never>?
     @ObservationIgnored private var signalWatcher: Task<Void, Never>?
+    @ObservationIgnored private var refresher: Task<Void, Never>?
+    @ObservationIgnored private var alertingSince: [UUID: Date] = [:]
+    @ObservationIgnored private var refreshing = false
+    var keepAliveRunning = false
+
+    init() {
+        startRefresher()
+    }
 
     var appGroupText: String {
         if let group = AppGroup.resolved { return "✅ \(group.id)" }
@@ -56,6 +64,47 @@ final class AppModel {
         }
         checkPendingScan()
         startPendingWatchers()
+    }
+
+    // MARK: 刷新：響了 N 秒還沒解除，就取消它、1 秒後換一顆新的（新的才有聲音）
+
+    private func startRefresher() {
+        guard refresher == nil else { return }
+        refresher = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                await self.refreshTick()
+            }
+        }
+    }
+
+    private func refreshTick() async {
+        let latest = Store.load()
+
+        // 上膛期間保持 App 活著，解除後就停
+        if latest.phase.missionPending { KeepAlive.shared.start() } else { KeepAlive.shared.stop() }
+        keepAliveRunning = KeepAlive.shared.running
+
+        guard latest.phase.missionPending, latest.refreshSeconds > 0,
+              !showQRScanner, !scanning, !refreshing else {
+            alertingSince.removeAll()
+            return
+        }
+        let list = (try? AlarmManager.shared.alarms) ?? []
+        let now = Date()
+        var current: [UUID: Date] = [:]
+        for alarm in list where AlarmController.isAlerting(alarm) {
+            current[alarm.id] = alertingSince[alarm.id] ?? now
+        }
+        alertingSince = current
+        guard let oldest = current.values.min(),
+              now.timeIntervalSince(oldest) >= Double(latest.refreshSeconds) else { return }
+
+        refreshing = true
+        alertingSince.removeAll()
+        Log.write("🔄 響了 \(latest.refreshSeconds)s 還沒解除 → 換一顆新的")
+        await AlarmController.scheduleSequence(startIn: 1, reason: "刷新")
+        refreshing = false
     }
 
     func onInactive() {

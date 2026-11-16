@@ -13,6 +13,7 @@ struct ContentView: View {
                     LabeledContent("階段", value: model.state.phase.title)
                     LabeledContent("按停止被重排", value: "\(model.state.rearmCount) 次")
                     LabeledContent("AlarmKit 權限", value: model.authState)
+                    LabeledContent("背景保活", value: model.keepAliveRunning ? "✅ 執行中" : "未啟動")
                     LabeledContent("App Group", value: model.appGroupText)
                     LabeledContent("憑證", value: model.profileText)
                         .foregroundStyle(model.profileWarning ? .red : .primary)
@@ -59,6 +60,8 @@ struct ContentView: View {
                             value: model.binding(\.rearmSeconds), in: 1...120)
                     Stepper("緩衝 \(model.state.bufferSeconds) 秒",
                             value: model.binding(\.bufferSeconds), in: 5...300, step: 5)
+                    Stepper(model.state.refreshSeconds == 0 ? "刷新：關閉" : "響 \(model.state.refreshSeconds) 秒沒解除就換新的一顆",
+                            value: model.binding(\.refreshSeconds), in: 0...60, step: 1)
                     Stepper("保底鬧鐘每 \(model.state.chainSeconds) 秒一顆",
                             value: model.binding(\.chainSeconds), in: 3...120, step: 1)
                     Stepper("保底鬧鐘 \(model.state.chainCount) 顆（約 \(model.state.chainSeconds * model.state.chainCount / 60) 分鐘）",
