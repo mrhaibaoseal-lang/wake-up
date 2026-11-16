@@ -5,6 +5,9 @@ on:
     branches: ["claude/**", "main"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
@@ -30,6 +33,7 @@ jobs:
           xcodebuild -project WakeUp.xcodeproj -target WakeUp \
             -configuration Release -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build
 
       - name: Package IPA
@@ -44,3 +48,15 @@ jobs:
           name: WakeUp-unsigned-ipa
           path: out/WakeUp-unsigned.ipa
           retention-days: 14
+
+      # 固定網址，手機 Safari 不用登入就能下載：
+      # https://github.com/${{ github.repository }}/releases/download/poc-latest/WakeUp-unsigned.ipa
+      - name: Publish to release "poc-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete poc-latest -y --cleanup-tag || true
+          gh release create poc-latest out/WakeUp-unsigned.ipa \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "PoC 最新版（build ${{ github.run_number }}）" \
+            --notes "未簽名 IPA，用 Feather 簽名安裝。commit ${GITHUB_SHA::7}"

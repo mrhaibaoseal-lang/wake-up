@@ -6,9 +6,11 @@
 
 ## 取得 IPA
 
-1. 每次 push，GitHub Actions 會自動編出**未簽名**的 IPA。
-2. 到 repo 的 **Actions → Build unsigned IPA → 最新一次執行 → Artifacts** 下載 `WakeUp-unsigned-ipa`（zip 檔，裡面是 `WakeUp-unsigned.ipa`）。
-3. 在「檔案」App 解壓縮，用 **Feather** 開啟 IPA，選 Flarestore 的 .p12 + profile 簽名安裝。
+1. 每次 push，GitHub Actions 會自動編出**未簽名**的 IPA，並更新到 Release `poc-latest`。
+2. 手機直接下載（固定網址，不用登入）：
+   https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/WakeUp-unsigned.ipa
+   也可以把這個網址貼進 Feather 的「從網址匯入」。
+3. 用 **Feather** 選 Flarestore 的 .p12 + profile 簽名安裝。
    - **不要**勾「移除擴充功能 / Remove PlugIns」，小工具要用。
    - Bundle ID 保持 `app.calcite3909.scorpio3556`（不需要改）。
 
