@@ -170,6 +170,8 @@ struct PoCState: Codable {
     var chainSeconds: Int = 120  // 保底鬧鐘間隔（鬧鐘疊在一起會只剩震動，所以預設只排 1 顆）
     var chainCount: Int = 1      // 保底鬧鐘顆數
     var refreshSeconds: Int = 10 // 響了幾秒還沒解除就換一顆新的（0 = 關閉）
+    var sirenEnabled: Bool = true // 時間到後 App 自己播警報聲（按鍵停不掉）
+    var alarmDate: Date? = nil    // 這次上膛預定第一次響的時間
     var sequenceGeneration: Int = 0  // 每次重排 +1，舊的排程迴圈看到就停
     var lastUpdated: Date = Date()
 
@@ -193,6 +195,8 @@ struct PoCState: Codable {
         chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
         sequenceGeneration = try c.decodeIfPresent(Int.self, forKey: .sequenceGeneration) ?? d.sequenceGeneration
         refreshSeconds = try c.decodeIfPresent(Int.self, forKey: .refreshSeconds) ?? d.refreshSeconds
+        sirenEnabled = try c.decodeIfPresent(Bool.self, forKey: .sirenEnabled) ?? d.sirenEnabled
+        alarmDate = try c.decodeIfPresent(Date.self, forKey: .alarmDate)
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }

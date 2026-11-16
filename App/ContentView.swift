@@ -62,6 +62,7 @@ struct ContentView: View {
                             value: model.binding(\.bufferSeconds), in: 5...300, step: 5)
                     Stepper(model.state.refreshSeconds == 0 ? "刷新：關閉" : "響 \(model.state.refreshSeconds) 秒沒解除就換新的一顆",
                             value: model.binding(\.refreshSeconds), in: 0...60, step: 1)
+                    Toggle("App 自己播警報聲（按鍵停不掉）", isOn: model.binding(\.sirenEnabled))
                     Stepper("保底鬧鐘每 \(model.state.chainSeconds) 秒一顆",
                             value: model.binding(\.chainSeconds), in: 3...120, step: 1)
                     Stepper("保底鬧鐘 \(model.state.chainCount) 顆（約 \(model.state.chainSeconds * model.state.chainCount / 60) 分鐘）",

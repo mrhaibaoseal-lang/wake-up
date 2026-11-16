@@ -85,6 +85,10 @@ final class AppModel {
         if latest.phase.missionPending { KeepAlive.shared.start() } else { KeepAlive.shared.stop() }
         keepAliveRunning = KeepAlive.shared.running
 
+        // 時間到了還沒掃碼：App 自己播警報聲。掃描緩衝中（phase = buffer）暫停。
+        let due = latest.alarmDate.map { $0 <= Date() } ?? false
+        KeepAlive.shared.setSiren(latest.sirenEnabled && latest.phase == .armed && due)
+
         guard latest.phase.missionPending, latest.refreshSeconds > 0,
               !showQRScanner, !scanning, !refreshing else {
             alertingSince.removeAll()
@@ -172,6 +176,7 @@ final class AppModel {
                 $0.phase = .armed
                 $0.rearmCount = 0
                 $0.pendingScan = false
+                $0.alarmDate = Date().addingTimeInterval(seconds)
             }
             await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
             refresh()
