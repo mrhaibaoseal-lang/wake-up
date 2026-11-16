@@ -1,52 +1,70 @@
-# 架構決策
+# 架構
 
-## 核心原則：Fail-loud
+## 設計原則
 
-任何時刻，系統層都預先排好一顆「會響、要 App 主動拆掉」的 AlarmKit 鬧鐘。
-App 被殺、當機、重開機、憑證失效，結果都是「響」，不是「安靜」。
+1. **Fail-loud**：任何時候系統層都有一顆會響的 AlarmKit 鬧鐘在等著。App 死掉、被殺、重開機，結果都是「響」，不是「安靜」。
+2. **唯一出口是掃 QR**：上膛後所有設定、重置、重新產生 QR 都鎖住。
+3. **多層聲音，各補彼此的弱點**：
 
-- 主引擎：**AlarmKit**（iOS 26+）。不受靜音鍵與專注模式影響，App 被殺也會響。
-- 「停止」按鈕移不掉 → 掛 `stopIntent`，任務沒完成就立刻排「現在 + N 秒」的新鬧鐘。
-- 「去掃描」= `secondaryIntent`：停掉這次響鈴、排 +45 秒緩衝鬧鐘、打開 App 自動開 NFC。
-- 無聲音訊保活、音量 slider 技巧、60 發通知 → 降級成選配或刪除（通知會被靜音鍵消音、保活遇中斷就死）。
+| 層 | 誰負責 | 能擋 | 弱點 |
+|---|---|---|---|
+| AlarmKit 系統鬧鐘 | iOS | App 被殺、靜音鍵、專注模式 | 實體按鍵一按就停；疊加只震動；螢幕亮時可能只震一下 |
+| 按停止 N 秒重響 | `StopAlarmIntent` | 按「停止」 | 實體按鍵不會觸發它 |
+| 刷新 | App（背景保活中） | 被按鍵靜音、疊加只震動 | App 被滑掉就失效 |
+| App 警報聲 | App（背景保活中） | 實體按鍵 | 走媒體音量；App 被滑掉就失效 |
+| 引導使用模式 | iOS（使用者手動開啟） | 實體按鍵、滑掉 App、刪除 App | 要使用者睡前自己開；強制重開機可以解除 |
 
-## 狀態機（目標版本）
+## 狀態機
 
-| 狀態 | 系統層預埋 | 離開條件 |
+存在 App Group 的 `state.json`（`PoCState`），App、Widget、Intent 共用。
+
+```
+idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到 QR──▶ verified
+                ▲                     │
+                └──關掉相機／緩衝到期──┘
+```
+
+| 狀態 | 意義 | 系統層預排 |
 |---|---|---|
-| `armed` | 主鬧鐘 + 雲端截止時間 | 鬧鐘觸發 → `ringing` |
-| `ringing` | 按停止 → 排 now+N 秒 | NFC 驗證 → `probation`；去掃描 → `buffer` |
-| `buffer` | now+45 秒 | NFC 驗證 → `probation`；到時 → `ringing` |
-| `probation` | 下一次隨機抽查時間 | 被動驗證（步數/活動）通過就往後推；離家或出門時間 → `done` |
-| `done` | 全部取消 + 回報雲端 | — |
+| `idle` | 未上膛 | 無 |
+| `armed` | 已上膛（響鈴前、響鈴中都是） | 鬧鐘時間的那顆；響鈴中則由刷新／停止持續換新 |
+| `buffer` | 掃描中，聲音暫停 | 緩衝秒數後的那顆 |
+| `verified` | 掃 QR 成功，全部取消 | 無 |
 
-規則：任何狀態逾時，或任何預排鬧鐘觸發，都回到 `ringing`。
-狀態存「事件 + 截止時間」，由 `reconcile()` 推算，並與 AlarmKit 現存鬧鐘對帳（不一致時以較吵的一方為準）。
+`missionPending = armed || buffer`。
 
-## 解鎖：NFC UID 白名單
+### 排程的關鍵機制
 
-- 用 `NFCTagReaderSession` 讀硬體 UID，不只看 NDEF 內容。
-- 2–3 顆標籤分散在不同房間，響鈴時才隨機指定今天要掃哪顆。
-- 進階：NTAG 424 DNA 的 SUN（遞增計數器 + CMAC），無法複製也無法重放。
+- `AlarmController.scheduleSequence(startIn:reason:)`：先取消全部，再排「第一顆在 +N 秒，之後每 `chainSeconds` 一顆，共 `chainCount` 顆」。預設 `chainCount = 1`。
+- **世代編號** `sequenceGeneration`：每次重排或解除就 +1，還在跑的舊排程迴圈看到編號變了就停，避免解除後又冒出鬧鐘。
+- `AlarmController.disarm`：解除時讓世代失效、取消全部，並在 1、3、6 秒後補清。
 
-## 防回籠覺
+## 檔案職責
 
-- 驗證成功的同時就排好下一次抽查鬧鐘（預設失敗）。
-- 被動驗證優先：`CMPedometer` 步數 + `CMMotionActivityManager` 非持續靜止 → 悄悄往後推。
-- 被動沒過 → 要求再掃一次（另一顆）標籤，而不是按按鈕。
-- 抽查次數與間隔隨機化。
+| 檔案 | 職責 |
+|---|---|
+| `project.yml` | XcodeGen 設定：Bundle ID、Info.plist、entitlements、背景音訊、圖示 |
+| `.github/workflows/build-ipa.yml` | 編譯未簽名 IPA、產生 Feather `source.json`、上傳到 Release `poc-latest` |
+| `Shared/Shared.swift` | `ProvisioningInfo`（讀 embedded.mobileprovision）、`AppGroup`（自動挑可用群組）、`Log`、`Phase`、`PoCState`（容錯解碼）、`Store`、`CrossProcess`（Darwin 通知） |
+| `Shared/AlarmSupport.swift` | `AlarmController`（排程、取消、世代、解除）、`StopAlarmIntent`、`GoScanIntent` |
+| `App/WakeUpApp.swift` | App 入口、`AppDelegate`、前景／背景切換 |
+| `App/AppModel.swift` | 主要邏輯：上膛、刷新迴圈（每 2 秒）、保活與警報聲開關、引導模式偵測、掃描緩衝、驗證、QR、NFC |
+| `App/ContentView.swift` | 主畫面（卡片式）、進階設定 `AdvancedView`、記錄 `LogView` |
+| `App/ArmedView.swift` | 上膛後蓋住整個畫面：全黑夜間畫面／響鈴畫面；`VolumeForcer`、`ScreenDimmer` |
+| `App/KeepAlive.swift` | 音訊引擎：無聲保活、警報聲播放、中斷恢復 |
+| `App/QRSupport.swift` | 產生 QR 圖片、VisionKit 掃描器、QR 顯示頁 |
+| `App/NFCScanner.swift` | 讀 NFC 標籤 UID |
+| `App/TerminationGuard.swift` | App 被滑掉時的備援（實測效果有限）、通知連發 |
+| `App/Sounds/wake_alarm.wav` | 程式合成的刺耳警報音（AlarmKit 與 App 警報聲共用） |
+| `App/Assets.xcassets` | App 圖示 |
+| `Widget/WakeWidgets.swift` | 桌面小工具（顯示狀態）、AlarmKit 的 Live Activity |
 
-## 憑證（Flarestore Ad Hoc profile）
+## 每天的流程
 
-- App ID：`app.calcite3909.scorpio3556`（明確 ID），到期 2027-10-30。
-- 有：NFC（NDEF/TAG）、App Groups（`group.81c139ae9a27a7f8.1`–`.5`）、Time Sensitive、HealthKit。
-- 沒有：Family Controls、Critical Alerts。
-- App 啟動時從 `embedded.mobileprovision` 讀到期日，14 天內警告；App Group 不寫死，取第一個可讀寫的。
-- 撤銷風險的兜底：雲端「沒收到解除就觸發」的死人開關 + 系統時鐘 App 一顆晚 10 分鐘的保險鬧鐘。
-
-## 待辦（PoC 之後）
-
-- 雲端死人開關（Cloudflare Worker cron，上膛時註冊截止時間）。
-- `probation` 抽查 + CoreMotion 被動驗證。
-- 上膛前檢查清單（音訊路由、充電、AlarmKit 授權）。
-- App Intents 給捷徑自動化當 watchdog。
+| 時間 | 使用者 | App |
+|---|---|---|
+| 睡前 | 選時間 → 上膛 → 連按三下側鍵開始引導模式 → 插電 | 排 AlarmKit 鬧鐘、開始無聲保活、顯示全黑畫面 |
+| 鬧鐘時間 | — | AlarmKit 響＋App 警報聲；響鈴畫面亮度最高、媒體音量拉滿 |
+| 響鈴中 | 走到客廳 | 每 5 秒左右刷新 AlarmKit 鬧鐘；按停止 1 秒後重響 |
+| 按「掃描」 | 對著 QR | 全部暫停，緩衝 20 秒 |
+| 掃到 QR | 看到引導模式密碼 → 連按三下側鍵輸入 → 結束 | 全部取消、停止保活與警報聲、顯示密碼 |

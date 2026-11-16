@@ -1,70 +1,94 @@
-# wake-up
+# 起床（wake-up）
 
-自用的 iOS 防賴床鬧鐘（SwiftUI + AlarmKit），側載安裝。設計決策見 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+自用的 iOS 防賴床鬧鐘（SwiftUI + AlarmKit），側載安裝。
 
-目前是 **PoC（原型）**，只用來驗證三個風險最高的假設。
+鬧鐘響了之後，**唯一能讓它停的方法是走到客廳（可設定）掃一張印好的 QR Code**。搭配 iOS「引導使用模式」讓音量鍵、側鍵失效，App 也滑不掉、刪不掉。
+
+> 換 AI 或換人接手？先讀 [`AGENTS.md`](AGENTS.md)。
+
+## 功能
+
+- **系統級鬧鐘（AlarmKit）**：無視靜音鍵與專注模式，App 被殺也會響
+- **刺耳警報音**：系統鬧鐘和 App 自己的警報聲共用程式合成的音檔
+- **App 警報聲**：時間到後 App 自己播放，實體按鍵停不掉
+- **按停止就重響**、**被靜音自動換新的一顆**（刷新）
+- **QR Code 解鎖**：QR 在手機上隨機產生，紙本遺失可重印、App 重裝可掃紙本恢復
+- **引導模式密碼**：App 保管，掃到 QR 才顯示
+- **上膛後鎖住**所有設定與重置
+- **全黑夜間畫面**（防 OLED 烙印）、時間到切換成響鈴畫面
+- NFC 標籤解鎖（UID 白名單，標籤到貨後可改用）
+- 桌面小工具、App 內記錄
 
 ## 安裝與更新
 
-**推薦：Feather 來源（自動通知更新）**
-在 Feather 新增來源：
-`https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/source.json`
+**推薦：Feather 來源（會自動提示更新）**
+
+```
+https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/source.json
+```
 
 **或直接下載 IPA（固定網址）**
+
 https://github.com/mrhaibaoseal-lang/wake-up/releases/download/poc-latest/WakeUp-unsigned.ipa
 
-用 Feather 選 Flarestore 的 .p12 + profile 簽名安裝。不要勾「移除 PlugIns」，Bundle ID 保持 `app.calcite3909.scorpio3556`。
-每次 push 都會由 GitHub Actions 重新編譯並更新上面兩個網址（版本號 1.0.<build>）。
+用 Feather 選自己的 `.p12` + `.mobileprovision` 簽名安裝：
+
+- **不要**勾「移除 PlugIns」（小工具要用）
+- Bundle ID 保持 `app.calcite3909.scorpio3556`
+
+每次 push 到開發分支，GitHub Actions 會重新編譯並更新上面兩個網址，版本號是 `1.0.<build>`。
+
+## 第一次設定
+
+1. 在「設定」填 **QR Code 貼在**哪裡（預設客廳）
+2. **產生我的 QR Code** → 儲存影像 → 印出來（例如 7-11 ibon），貼好；把相簿裡的圖刪掉
+3. **產生引導模式密碼** → 照畫面到 **設定 > 輔助使用 > 引導使用模式**：
+   - 打開引導使用模式
+   - 密碼設成 App 顯示的那組 4 位數
+   - **Face ID 關掉**
+4. 系統設定：
+   - 設定 > 聲音與觸覺：鈴聲音量拉到最大，「使用按鈕調整」關閉
+   - 設定 > 一般 > 軟體更新 > 自動更新：關閉
+5. 照 [`docs/SETTINGS.md`](docs/SETTINGS.md) 設好「進階設定」並跑一次測試清單
 
 ## 每天的用法
 
-1. 睡前：選時間 → 上膛 → 連按三下側邊按鈕開始引導使用模式 → 插電
-2. 早上：走到 QR Code 的位置（預設客廳）掃碼 → 畫面顯示引導模式密碼 → 連按三下側邊按鈕輸入密碼結束
+| 時間 | 做什麼 |
+|---|---|
+| 睡前 | 選時間 → **上膛** → 連按三下側邊按鈕 → 選項關掉「側邊按鈕」「音量按鈕」→ **開始** → 插電 |
+| 早上 | 鬧鐘和警報聲一起響 → 走到客廳 → 按「掃描」→ 掃 QR → 畫面顯示密碼 → 連按三下側鍵輸入密碼 → 結束 |
 
-## 測試清單
+## 在電腦上取得專案
 
-先在 App 裡確認「狀態」區：**App Group 顯示 ✅**、**憑證剩餘天數讀得到**，然後把「起床狀態」小工具加到桌面。
+程式碼在 **`claude/ios-alarm-anti-oversleep-arch-0kfw86`** 分支（`main` 目前只有初始 commit）。
 
-### A. AlarmKit 基本行為
-| # | 步驟 | 要觀察 |
-|---|---|---|
-| A1 | 按「30 秒後響」，第一次會跳授權，允許 | 30 秒後是否全螢幕響鈴 |
-| A2 | 開**靜音模式**、開**專注模式**再測 A1 | 還會不會出聲 |
-| A3 | 按「2 分鐘後響」，**鎖屏**等 | 鎖屏時的響鈴畫面長怎樣 |
-| A4 | 響鈴時按**側邊按鈕** / **音量鍵** | 會停止？只是靜音？還是沒反應 |
-| A5 | 響鈴時用音量鍵調小聲 | 聲音跟的是鈴聲音量還是媒體音量（設定 > 聲音與觸覺 >「使用按鈕調整」開/關各測一次） |
+- 下載 zip：https://github.com/mrhaibaoseal-lang/wake-up/archive/refs/heads/claude/ios-alarm-anti-oversleep-arch-0kfw86.zip
+- 或用 Git：
 
-### B. 按停止會不會重響（整個架構的地基）
-| # | 步驟 | 要觀察 |
-|---|---|---|
-| B1 | 上膛 → 響鈴時按「停止」 | 15 秒後有沒有再響；記錄頁有沒有 `🛑 stopIntent` 和新的 `⏰ 排程` |
-| B2 | 在**鎖屏**狀態重複 B1 | 鎖屏時 stopIntent 是否一樣會被呼叫 |
-| B3 | 把「按停止後 N 秒重響」調到 1、3、5 秒 | 多短的間隔還能穩定重響 |
-| B4 | 關掉「stopIntent 內呼叫 stop()」再按停止 | 鬧鐘會不會**繼續響**（如果會，就是最狠的版本） |
-| B5 | 上膛後**從 App 切換器滑掉 App**，等鬧鐘響、按停止 | App 被殺後重排是否仍有效 |
+  ```powershell
+  git clone -b claude/ios-alarm-anti-oversleep-arch-0kfw86 https://github.com/mrhaibaoseal-lang/wake-up.git
+  ```
 
-### C. 去掃描 + NFC
-| # | 步驟 | 要觀察 |
-|---|---|---|
-| C1 | 按「登錄新標籤」掃一顆 NFC 標籤 | 白名單出現 UID |
-| C2 | 上膛 → 響鈴時按「去掃描」 | App 有沒有被打開並**自動**跳出 NFC 掃描 |
-| C3 | 掃白名單標籤 | 階段變「已驗證」，系統內鬧鐘清空 |
-| C4 | 按「去掃描」後**不掃**，等緩衝秒數 | 會不會再響 |
-| C5 | 掃一顆不在白名單的卡（悠遊卡也可以） | 記錄顯示「不在白名單」，不解除 |
-
-### D. 狀態還原
-| # | 步驟 | 要觀察 |
-|---|---|---|
-| D1 | 上膛 → 滑掉 App → 重開 | 階段、白名單、系統內鬧鐘是否正確 |
-| D2 | 上膛 → **重新開機** → 解鎖 | 鬧鐘還在不在、時間到會不會響 |
-
-測完到「記錄」頁按右上角分享，把整段記錄貼回來即可。
-
-## 緊急停止
-
-測試中停不下來：App 內按「全部取消並重置」。最後手段：刪除 App 會清掉它所有鬧鐘。
+Windows 無法編譯 iOS App：改完程式後 push，由 GitHub Actions 編譯。
 
 ## 開發
 
-- 專案由 [XcodeGen](https://github.com/yonaskolb/XcodeGen) 從 `project.yml` 產生，`*.xcodeproj` 不進版控。
-- 需要 Xcode 26 以上（AlarmKit），部署目標 iOS 26。
+- 專案由 [XcodeGen](https://github.com/yonaskolb/XcodeGen) 從 `project.yml` 產生，`*.xcodeproj` 不進版控
+- 需要 Xcode 26 以上（AlarmKit），部署目標 iOS 26
+- 編譯流程：`.github/workflows/build-ipa.yml`
+
+## 文件
+
+| 文件 | 內容 |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | 給 AI 的接手指南、限制、絕對不要做的事 |
+| [`docs/HISTORY.md`](docs/HISTORY.md) | 完整開發紀錄與每個決定的原因 |
+| [`docs/FINDINGS.md`](docs/FINDINGS.md) | 已驗證的 iOS / AlarmKit 行為 |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 架構、狀態機、檔案職責 |
+| [`docs/SETTINGS.md`](docs/SETTINGS.md) | 每個設定的意義、建議值、測試清單 |
+| [`docs/TODO.md`](docs/TODO.md) | 待測項目與下一步功能 |
+
+## 緊急停止
+
+- 上膛中只能掃 QR 解除
+- QR 遺失：引導模式下強制重開機（音量上、音量下、長按側鍵）→ 刪除 App 會清掉它所有的鬧鐘 → 重裝後掃紙本或重新產生
