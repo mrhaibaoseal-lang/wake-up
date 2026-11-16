@@ -137,6 +137,8 @@ struct PoCState: Codable {
     var nfcWhitelist: [String] = []
     var unlockMethod: UnlockMethod = .qr
     var qrToken: String? = nil
+    var chainSeconds: Int = 30   // 保底鬧鐘間隔
+    var chainCount: Int = 40     // 保底鬧鐘顆數（30s × 40 = 20 分鐘）
     var lastUpdated: Date = Date()
 
     init() {}
@@ -155,6 +157,8 @@ struct PoCState: Codable {
         nfcWhitelist = try c.decodeIfPresent([String].self, forKey: .nfcWhitelist) ?? d.nfcWhitelist
         unlockMethod = try c.decodeIfPresent(UnlockMethod.self, forKey: .unlockMethod) ?? d.unlockMethod
         qrToken = try c.decodeIfPresent(String.self, forKey: .qrToken)
+        chainSeconds = try c.decodeIfPresent(Int.self, forKey: .chainSeconds) ?? d.chainSeconds
+        chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }
@@ -187,6 +191,33 @@ enum Store {
         }
         WidgetCenter.shared.reloadAllTimelines()
         return state
+    }
+}
+
+// MARK: - 跨程序通知：「去掃描」按下時立刻叫醒前景的 App
+
+extension Notification.Name {
+    static let wakePendingScan = Notification.Name("wakePendingScan")
+}
+
+enum CrossProcess {
+    private static let darwinName = "app.calcite3909.scorpio3556.pendingScan" as CFString
+
+    static func postPendingScan() {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(darwinName), nil, nil, true
+        )
+    }
+
+    static func observePendingScan() {
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(), nil,
+            { _, _, _, _, _ in
+                NotificationCenter.default.post(name: .wakePendingScan, object: nil)
+            },
+            darwinName, nil, .deliverImmediately
+        )
     }
 }
 

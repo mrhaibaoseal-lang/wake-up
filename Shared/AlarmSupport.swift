@@ -30,8 +30,29 @@ enum AlarmController {
     }
 
     /// 排一顆「現在 + seconds」的系統級鬧鐘。
+    /// 取消現有的全部鬧鐘，重排一整串：第一顆在 +seconds，之後每 chainSeconds 一顆保底。
+    /// 被音量鍵、側鍵等任何方式弄安靜，下一顆保底照響；只有驗證成功能全部取消。
+    static func scheduleSequence(startIn seconds: TimeInterval, reason: String) async {
+        let state = Store.load()
+        cancelAll(reason: "重排序列（\(reason)）", log: false)
+        let count = max(1, state.chainCount)
+        var ok = 0
+        var failed = 0
+        for i in 0..<count {
+            let offset = seconds + TimeInterval(i * state.chainSeconds)
+            do {
+                try await schedule(after: offset, reason: reason, log: i == 0)
+                ok += 1
+            } catch {
+                failed += 1
+                if failed == 1 { Log.write("❌ 第 \(i + 1) 顆排程失敗：\(error)") }
+            }
+        }
+        Log.write("⛓️ 排好 \(ok) 顆（首顆 +\(Int(seconds))s，之後每 \(state.chainSeconds)s 一顆），失敗 \(failed) 顆")
+    }
+
     @discardableResult
-    static func schedule(after seconds: TimeInterval, reason: String) async throws -> UUID {
+    static func schedule(after seconds: TimeInterval, reason: String, log: Bool = true) async throws -> UUID {
         let id = UUID()
         let fireDate = Date().addingTimeInterval(seconds)
 
@@ -57,17 +78,17 @@ enum AlarmController {
             sound: .default
         )
         _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
-        Log.write("⏰ 排程 \(id.short) 於 \(Log.formatter.string(from: fireDate))（+\(Int(seconds))s）原因：\(reason)")
+        if log { Log.write("⏰ 排程 \(id.short) 於 \(Log.formatter.string(from: fireDate))（+\(Int(seconds))s）原因：\(reason)") }
         return id
     }
 
-    static func cancelAll(reason: String) {
+    static func cancelAll(reason: String, log: Bool = true) {
         let list = (try? AlarmManager.shared.alarms) ?? []
         for alarm in list {
             do { try AlarmManager.shared.cancel(id: alarm.id) }
             catch { Log.write("取消 \(alarm.id.short) 失敗：\(error)") }
         }
-        Log.write("🧹 取消全部鬧鐘（\(list.count) 顆），原因：\(reason)")
+        if log { Log.write("🧹 取消全部鬧鐘（\(list.count) 顆），原因：\(reason)") }
     }
 
     static func describe(_ alarm: Alarm) -> String {
@@ -99,8 +120,8 @@ struct StopAlarmIntent: LiveActivityIntent {
 
         if state.phase.missionPending && state.stopRearmEnabled {
             Store.update { $0.rearmCount += 1 }
-            try await AlarmController.schedule(
-                after: TimeInterval(state.rearmSeconds),
+            await AlarmController.scheduleSequence(
+                startIn: TimeInterval(state.rearmSeconds),
                 reason: "按停止 → \(state.rearmSeconds)s 後重響"
             )
         }
@@ -124,21 +145,23 @@ struct GoScanIntent: LiveActivityIntent {
         let state = Store.load()
         Log.write("🚶 goScanIntent alarm=\(alarmID.prefix(8)) phase=\(state.phase.rawValue)")
 
-        if let id = UUID(uuidString: alarmID) {
-            do { try AlarmManager.shared.stop(id: id) }
-            catch { Log.write("stop() 失敗：\(error)") }
+        guard state.phase.missionPending else {
+            if let id = UUID(uuidString: alarmID) { try? AlarmManager.shared.stop(id: id) }
+            return .result()
         }
 
-        if state.phase.missionPending {
-            Store.update {
-                $0.phase = .buffer
-                $0.pendingScan = true
-            }
-            try await AlarmController.schedule(
-                after: TimeInterval(state.bufferSeconds),
-                reason: "緩衝 \(state.bufferSeconds)s 到了還沒掃到"
-            )
+        // 先設旗標並通知 App，讓相機盡快跳出來，再慢慢排鬧鐘
+        Store.update {
+            $0.phase = .buffer
+            $0.pendingScan = true
         }
+        CrossProcess.postPendingScan()
+
+        // 重排會取消全部（包含正在響的這顆）
+        await AlarmController.scheduleSequence(
+            startIn: TimeInterval(state.bufferSeconds),
+            reason: "緩衝 \(state.bufferSeconds)s 到了還沒掃到"
+        )
         return .result()
     }
 }

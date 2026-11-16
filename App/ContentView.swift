@@ -59,6 +59,10 @@ struct ContentView: View {
                             value: model.binding(\.rearmSeconds), in: 1...120)
                     Stepper("緩衝 \(model.state.bufferSeconds) 秒",
                             value: model.binding(\.bufferSeconds), in: 5...300, step: 5)
+                    Stepper("保底鬧鐘每 \(model.state.chainSeconds) 秒一顆",
+                            value: model.binding(\.chainSeconds), in: 10...120, step: 5)
+                    Stepper("保底鬧鐘 \(model.state.chainCount) 顆（約 \(model.state.chainSeconds * model.state.chainCount / 60) 分鐘）",
+                            value: model.binding(\.chainCount), in: 1...120, step: 5)
                     Toggle("按停止會重排", isOn: model.binding(\.stopRearmEnabled))
                     Toggle("stopIntent 內呼叫 stop()", isOn: model.binding(\.callStopInIntent))
                 }

@@ -19,6 +19,8 @@ final class AppModel {
     @ObservationIgnored private var registerMode = false
     @ObservationIgnored private let scanner = NFCScanner()
     @ObservationIgnored private var observer: Task<Void, Never>?
+    @ObservationIgnored private var pendingWatcher: Task<Void, Never>?
+    @ObservationIgnored private var signalWatcher: Task<Void, Never>?
 
     var appGroupText: String {
         if let group = AppGroup.resolved { return "✅ \(group.id)" }
@@ -49,10 +51,44 @@ final class AppModel {
         startObserving()
         let list = alarms.map(AlarmController.describe).joined(separator: ", ")
         Log.write("👀 進前景 phase=\(state.phase.rawValue) 系統內鬧鐘 \(alarms.count) 顆 [\(list)]")
-        if state.pendingScan {
-            state = Store.update { $0.pendingScan = false }
+        // 緩衝中打開 App 就直接開掃描
+        if state.phase == .buffer && !state.pendingScan {
             beginUnlock()
         }
+        checkPendingScan()
+        startPendingWatchers()
+    }
+
+    func onInactive() {
+        pendingWatcher?.cancel()
+        pendingWatcher = nil
+    }
+
+    /// 「去掃描」可能在 App 已經開著、或比 App 打開更晚才執行完，所以要持續檢查
+    private func startPendingWatchers() {
+        if signalWatcher == nil {
+            CrossProcess.observePendingScan()
+            signalWatcher = Task {
+                for await _ in NotificationCenter.default.notifications(named: .wakePendingScan) {
+                    self.checkPendingScan()
+                }
+            }
+        }
+        pendingWatcher?.cancel()
+        pendingWatcher = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                self.checkPendingScan()
+            }
+        }
+    }
+
+    private func checkPendingScan() {
+        let latest = Store.load()
+        guard latest.pendingScan else { return }
+        state = Store.update { $0.pendingScan = false }
+        Log.write("📷 收到去掃描，開啟掃描")
+        beginUnlock()
     }
 
     private func startObserving() {
@@ -83,11 +119,7 @@ final class AppModel {
                 $0.rearmCount = 0
                 $0.pendingScan = false
             }
-            do {
-                try await AlarmController.schedule(after: seconds, reason: "手動上膛")
-            } catch {
-                Log.write("❌ 排程失敗：\(error)")
-            }
+            await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
             refresh()
         }
     }
@@ -115,6 +147,7 @@ final class AppModel {
     // MARK: 解鎖
 
     func beginUnlock() {
+        guard !showQRScanner, !scanning else { return }
         switch state.unlockMethod {
         case .qr: showQRScanner = true
         case .nfc: startScan()

@@ -15,7 +15,7 @@ struct WakeUpApp: App {
                 .environment(model)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { model.onActive() }
+            if phase == .active { model.onActive() } else { model.onInactive() }
         }
     }
 }
