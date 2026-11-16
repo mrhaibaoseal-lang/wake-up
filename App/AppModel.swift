@@ -167,6 +167,7 @@ final class AppModel {
     func arm(after seconds: TimeInterval) {
         Task {
             guard await AlarmController.ensureAuthorized() else { refresh(); return }
+            NotificationBurst.requestAuthorization()
             state = Store.update {
                 $0.phase = .armed
                 $0.rearmCount = 0
@@ -194,6 +195,7 @@ final class AppModel {
             $0.pendingScan = false
         }
         AlarmController.disarm(reason: "手動重置")
+        NotificationBurst.clear()
         refresh()
     }
 
@@ -241,6 +243,7 @@ final class AppModel {
             $0.pendingScan = false
         }
         AlarmController.disarm(reason: "\(source) 驗證成功")
+        NotificationBurst.clear()
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
     }
