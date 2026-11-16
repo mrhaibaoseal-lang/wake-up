@@ -1,0 +1,10 @@
+WakeUp.xcodeproj/
+build/
+out/
+DerivedData/
+.DS_Store
+# Info.plist / entitlements 由 XcodeGen 從 project.yml 產生
+App/Info.plist
+Widget/Info.plist
+App/*.entitlements
+Widget/*.entitlements

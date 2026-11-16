@@ -1,0 +1,134 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: ["claude/**", "main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 新的 push 進來就取消還在跑的舊編譯，避免舊版蓋掉新版
+concurrency:
+  group: build-ipa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build (no code signing)
+        run: |
+          xcodebuild -project WakeUp.xcodeproj -target WakeUp \
+            -configuration Release -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION=1.0.${{ github.run_number }} \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Release-iphoneos/WakeUp.app out/Payload/
+          ls out/Payload/WakeUp.app/PlugIns || echo "⚠️ no PlugIns"
+          cd out && zip -qry WakeUp-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WakeUp-unsigned-ipa
+          path: out/WakeUp-unsigned.ipa
+          retention-days: 14
+
+      # 固定網址，手機 Safari 不用登入就能下載：
+      # https://github.com/${{ github.repository }}/releases/download/poc-latest/WakeUp-unsigned.ipa
+      # Feather 來源（AltStore 格式）：
+      # https://github.com/${{ github.repository }}/releases/download/poc-latest/source.json
+      - name: Generate Feather source
+        env:
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_number }}
+        run: |
+          cp App/Assets.xcassets/AppIcon.appiconset/icon.png out/icon.png
+          python3 - <<'PY'
+          import json, os, datetime
+          repo = os.environ["REPO"]; run = os.environ["RUN"]
+          base = f"https://github.com/{repo}/releases/download/poc-latest"
+          size = os.path.getsize("out/WakeUp-unsigned.ipa")
+          now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          version = f"1.0.{run}"
+          desc = "防賴床鬧鐘：走到指定地點掃 QR Code 才會停。"
+          app = {
+              "name": "起床",
+              "bundleIdentifier": "app.calcite3909.scorpio3556",
+              "developerName": "wake-up",
+              "subtitle": "掃碼才會停的鬧鐘",
+              "localizedDescription": desc,
+              "iconURL": f"{base}/icon.png",
+              "tintColor": "FF7338",
+              "version": version,
+              "versionDate": now,
+              "versionDescription": f"build {run}",
+              "downloadURL": f"{base}/WakeUp-unsigned.ipa",
+              "size": size,
+              "versions": [{
+                  "version": version,
+                  "buildVersion": run,
+                  "date": now,
+                  "localizedDescription": f"build {run}",
+                  "downloadURL": f"{base}/WakeUp-unsigned.ipa",
+                  "size": size,
+                  "minOSVersion": "26.0",
+              }],
+          }
+          source = {
+              "name": "起床",
+              "identifier": "app.calcite3909.wakeup.source",
+              "subtitle": "自用防賴床鬧鐘",
+              "description": desc,
+              "iconURL": f"{base}/icon.png",
+              "tintColor": "FF7338",
+              "apps": [app],
+              "news": [],
+          }
+          with open("out/source.json", "w", encoding="utf-8") as f:
+              json.dump(source, f, ensure_ascii=False, indent=2)
+          PY
+          cat out/source.json
+
+      - name: Publish to release "poc-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="PoC 最新版（build ${{ github.run_number }}）"
+          NOTES="未簽名 IPA，用 Feather 簽名安裝。commit ${GITHUB_SHA::7}"
+          FILES="out/WakeUp-unsigned.ipa out/source.json out/icon.png"
+          # 不先刪除：已存在就覆蓋檔案，下載網址不會有空窗
+          for attempt in 1 2 3 4; do
+            if gh release view poc-latest >/dev/null 2>&1; then
+              gh release upload poc-latest $FILES --clobber \
+                && gh release edit poc-latest --title "$TITLE" --notes "$NOTES" --prerelease \
+                && exit 0
+            else
+              gh release create poc-latest $FILES --prerelease --target "$GITHUB_SHA" \
+                --title "$TITLE" --notes "$NOTES" && exit 0
+            fi
+            echo "發佈失敗，第 $attempt 次，等待後重試"
+            sleep $((attempt * 15))
+          done
+          exit 1

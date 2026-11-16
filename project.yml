@@ -1,0 +1,59 @@
+name: WakeUp
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  WakeUp:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        # 必須與 Flarestore profile 的 App ID 一致
+        PRODUCT_BUNDLE_IDENTIFIER: app.calcite3909.scorpio3556
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: 起床
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSAlarmKitUsageDescription: 用來在指定時間發出無法被輕易關閉的起床鬧鐘。
+        NFCReaderUsageDescription: 掃描你貼好的 NFC 標籤來解除鬧鐘。
+        NSCameraUsageDescription: 掃描你貼好的 QR Code 來解除鬧鐘。
+        NSPhotoLibraryAddUsageDescription: 把你的解鎖 QR Code 存到相簿，拿去列印。
+        com.apple.developer.nfc.readersession.iso7816.select-identifiers: [D2760000850101]
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [audio]
+    entitlements:
+      path: App/WakeUp.entitlements
+      properties:
+        com.apple.developer.nfc.readersession.formats: [NDEF, TAG]
+        com.apple.security.application-groups: [group.81c139ae9a27a7f8.1]
+        com.apple.developer.usernotifications.time-sensitive: true
+    dependencies:
+      - target: WakeUpWidget
+  WakeUpWidget:
+    type: app-extension
+    platform: iOS
+    sources: [Widget, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.calcite3909.scorpio3556.widget
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: 起床狀態
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widget/WakeUpWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.81c139ae9a27a7f8.1]
