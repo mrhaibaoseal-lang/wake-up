@@ -83,7 +83,7 @@ enum AlarmController {
             attributes: attributes,
             stopIntent: StopAlarmIntent(alarmID: id.uuidString),
             secondaryIntent: GoScanIntent(alarmID: id.uuidString),
-            sound: .default
+            sound: Store.load().customSound ? .named("wake_alarm.wav") : .default
         )
         _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
         if log { Log.write("⏰ 排程 \(id.short) 於 \(Log.formatter.string(from: fireDate))（+\(Int(seconds))s）原因：\(reason)") }

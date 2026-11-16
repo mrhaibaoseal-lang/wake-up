@@ -311,6 +311,7 @@ struct AdvancedView: View {
 
             Section("響鈴行為") {
                 Toggle("App 警報聲（按鍵停不掉）", isOn: model.binding(\.sirenEnabled))
+                Toggle("系統鬧鐘用刺耳警報音", isOn: model.binding(\.customSound))
                 Stepper("按停止後 \(model.state.rearmSeconds) 秒重響",
                         value: model.binding(\.rearmSeconds), in: 1...120)
                 Stepper(model.state.refreshSeconds == 0 ? "刷新：關閉" : "響 \(model.state.refreshSeconds) 秒沒解除就換新的",

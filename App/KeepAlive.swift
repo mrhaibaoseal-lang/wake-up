@@ -86,10 +86,32 @@ final class KeepAlive {
         }
     }
 
+    private lazy var sirenBuffer: AVAudioPCMBuffer = loadSirenFile() ?? makeBuffer(siren: true)
+
     private func playSiren() {
         siren.stop()
-        siren.scheduleBuffer(makeBuffer(siren: true), at: nil, options: .loops)
+        siren.scheduleBuffer(sirenBuffer, at: nil, options: .loops)
         siren.play()
+    }
+
+    /// 跟系統鬧鐘用同一個警報音檔；讀不到就用程式產生的方波
+    private func loadSirenFile() -> AVAudioPCMBuffer? {
+        guard let url = Bundle.main.url(forResource: "wake_alarm", withExtension: "wav"),
+              let file = try? AVAudioFile(forReading: url),
+              file.processingFormat.sampleRate == format.sampleRate,
+              file.processingFormat.channelCount == format.channelCount,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length))
+        else {
+            Log.write("⚠️ 讀不到警報音檔，改用內建方波")
+            return nil
+        }
+        do {
+            try file.read(into: buffer)
+            return buffer
+        } catch {
+            Log.write("⚠️ 警報音檔讀取失敗：\(error.localizedDescription)")
+            return nil
+        }
     }
 
     /// 1 秒的緩衝：無聲，或 1000Hz / 1500Hz 交替的方波警報
