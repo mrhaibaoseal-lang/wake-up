@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import VisionKit
+import AVFoundation
 import CoreImage.CIFilterBuiltins
 
 enum QRCode {
@@ -28,36 +29,76 @@ enum QRCode {
 }
 
 /// VisionKit 的 QR 掃描器，掃到第一個 QR 就回傳內容。
+/// 相機要等畫面真的出現（viewDidAppear）才能啟動；太早呼叫 startScanning 會失敗、只剩黑畫面。
+/// 所以包一層容器，在 viewDidAppear 啟動，失敗就重試幾次。
 struct QRScannerView: UIViewControllerRepresentable {
     let onFound: (String) -> Void
 
     static var isSupported: Bool { DataScannerViewController.isSupported }
+    /// false = 相機權限被拒（還沒問過時不算，startScanning 會跳出詢問）
+    static var isAvailable: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        return status != .denied && status != .restricted
+    }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onFound: onFound) }
+    func makeUIViewController(context: Context) -> ScannerHost {
+        ScannerHost(onFound: onFound)
+    }
 
-    func makeUIViewController(context: Context) -> DataScannerViewController {
-        let scanner = DataScannerViewController(
+    func updateUIViewController(_ host: ScannerHost, context: Context) {}
+
+    final class ScannerHost: UIViewController, DataScannerViewControllerDelegate {
+        private let onFound: (String) -> Void
+        private var done = false
+        private let scanner = DataScannerViewController(
             recognizedDataTypes: [.barcode(symbologies: [.qr])],
             qualityLevel: .balanced,
             recognizesMultipleItems: false,
             isHighFrameRateTrackingEnabled: false,
             isHighlightingEnabled: true
         )
-        scanner.delegate = context.coordinator
-        return scanner
-    }
 
-    func updateUIViewController(_ scanner: DataScannerViewController, context: Context) {
-        guard !scanner.isScanning, !context.coordinator.done else { return }
-        do { try scanner.startScanning() }
-        catch { Log.write("QR 掃描器啟動失敗：\(error)（相機權限？）") }
-    }
+        init(onFound: @escaping (String) -> Void) {
+            self.onFound = onFound
+            super.init(nibName: nil, bundle: nil)
+        }
 
-    final class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        let onFound: (String) -> Void
-        var done = false
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-        init(onFound: @escaping (String) -> Void) { self.onFound = onFound }
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.backgroundColor = .black
+            scanner.delegate = self
+            addChild(scanner)
+            scanner.view.frame = view.bounds
+            scanner.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            view.addSubview(scanner.view)
+            scanner.didMove(toParent: self)
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            start(attempt: 1)
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            if scanner.isScanning { scanner.stopScanning() }
+        }
+
+        private func start(attempt: Int) {
+            guard !done, !scanner.isScanning, view.window != nil else { return }
+            do {
+                try scanner.startScanning()
+                Log.write("📷 QR 相機已啟動（第 \(attempt) 次）")
+            } catch {
+                Log.write("QR 掃描器啟動失敗（第 \(attempt) 次）：\(error)（可用：\(DataScannerViewController.isAvailable)）")
+                guard attempt < 5 else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                    self?.start(attempt: attempt + 1)
+                }
+            }
+        }
 
         func dataScanner(_ dataScanner: DataScannerViewController,
                          didAdd addedItems: [RecognizedItem],
@@ -81,11 +122,21 @@ struct QRScannerSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if QRScannerView.isSupported {
+                if !QRScannerView.isSupported {
+                    Text("這台裝置不支援 QR 掃描").padding()
+                } else if !QRScannerView.isAvailable {
+                    VStack(spacing: 12) {
+                        Image(systemName: "camera.fill").font(.largeTitle).foregroundStyle(.orange)
+                        Text("相機不能用").font(.headline)
+                        Text("到 設定 > 起床 > 相機 打開權限，再回來掃。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                } else {
                     QRScannerView { payload in model.handleQR(payload) }
                         .ignoresSafeArea()
-                } else {
-                    Text("這台裝置不支援 QR 掃描").padding()
                 }
             }
             .navigationTitle("掃\(model.state.scanLocation)的 QR Code")
