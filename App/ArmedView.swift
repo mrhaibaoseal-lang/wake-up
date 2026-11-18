@@ -82,21 +82,60 @@ struct ArmedView: View {
         .persistentSystemOverlays(.hidden)
     }
 
+    /// 主要的解鎖方式（設定的那種；不能用就換另一種）
+    private var primary: UnlockMethod {
+        let set = model.state.unlockMethod
+        if model.canUnlock(with: set) { return set }
+        return set == .qr ? .nfc : .qr
+    }
+
+    private var secondary: UnlockMethod? {
+        let other: UnlockMethod = primary == .qr ? .nfc : .qr
+        return model.canUnlock(with: other) ? other : nil
+    }
+
+    private func name(_ method: UnlockMethod) -> String { method == .qr ? "QR Code" : "NFC 卡片" }
+    private func icon(_ method: UnlockMethod) -> String { method == .qr ? "qrcode.viewfinder" : "wave.3.right" }
+    private func action(_ method: UnlockMethod) -> String { method == .qr ? "掃描 QR Code" : "感應 NFC 卡片" }
+
     private var ringing: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: 24) {
             Text("起床！").font(.system(size: 64, weight: .heavy)).foregroundStyle(.white)
-            Text("去\(model.state.scanLocation)掃 QR Code 才會停").font(.title3).foregroundStyle(.white)
+            Text("去\(model.state.scanLocation)\(primary == .qr ? "掃" : "感應")\(name(primary))才會停")
+                .font(.title3)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
             Button {
-                model.beginUnlock()
+                model.beginUnlock(method: primary)
             } label: {
-                Label("掃描", systemImage: "qrcode.viewfinder")
-                    .font(.title.bold())
+                Label(action(primary), systemImage: icon(primary))
+                    .font(.title2.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .padding(.horizontal, 32)
+            if let other = secondary {
+                Button {
+                    model.beginUnlock(method: other)
+                } label: {
+                    Label("改用\(name(other))", systemImage: icon(other))
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .padding(.horizontal, 48)
+            }
+            if let error = model.unlockError {
+                Text(error)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
         }
     }
 
@@ -109,10 +148,17 @@ struct ArmedView: View {
             Text(model.guidedAccessOn ? "引導使用模式 ✅" : "⚠️ 還沒開引導使用模式：連按三下側邊按鈕")
                 .font(.footnote)
                 .foregroundStyle(model.guidedAccessOn ? .gray : .orange)
-            Text("要取消只能掃 QR").font(.footnote).foregroundStyle(.gray)
-            Button("掃描 QR 解除") { model.beginUnlock() }
+            Text("要取消只能\(primary == .qr ? "掃 QR Code" : "感應 NFC 卡片")").font(.footnote).foregroundStyle(.gray)
+            Button(action(primary) + "解除") { model.beginUnlock(method: primary) }
                 .buttonStyle(.bordered)
                 .padding(.top, 8)
+            if let other = secondary {
+                Button("改用\(name(other))") { model.beginUnlock(method: other) }
+                    .font(.footnote)
+            }
+            if let error = model.unlockError {
+                Text(error).font(.footnote).foregroundStyle(.red)
+            }
         }
     }
 

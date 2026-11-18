@@ -11,6 +11,17 @@ final class AppModel {
     var lastUID = "—"
     var scanning = false
     var showQRScanner = false
+    /// 最近一次解鎖失敗的原因，顯示在響鈴畫面上（成功或重新開始掃描時清掉）
+    var unlockError: String?
+    @ObservationIgnored private var scanStartedAt: Date?
+
+    /// 這個方式現在能不能用來解鎖
+    func canUnlock(with method: UnlockMethod) -> Bool {
+        switch method {
+        case .qr: return state.qrToken != nil
+        case .nfc: return !state.nfcWhitelist.isEmpty
+        }
+    }
     var showQRCode = false
 
     /// 上膛中（任務未完成）鎖住設定與重置，避免半夢半醒的自己關掉
@@ -285,10 +296,23 @@ final class AppModel {
 
     // MARK: 解鎖
 
-    func beginUnlock() {
+    /// 開始解鎖。method 不給就用設定的方式；設定的方式不能用（例如 NFC 沒登錄卡）就自動改用另一種。
+    func beginUnlock(method: UnlockMethod? = nil) {
+        // NFC 視窗沒回應超過 70 秒，當作卡住、允許重來
+        if scanning, let started = scanStartedAt, Date().timeIntervalSince(started) > 70 {
+            Log.write("⚠️ NFC 掃描狀態卡住，重設")
+            scanning = false
+        }
         guard !showQRScanner, !scanning else { return }
+        var chosen = method ?? state.unlockMethod
+        if !canUnlock(with: chosen) {
+            let other: UnlockMethod = chosen == .qr ? .nfc : .qr
+            if canUnlock(with: other) { chosen = other }
+        }
+        unlockError = nil
         if state.phase.missionPending { startScanBuffer() }
-        switch state.unlockMethod {
+        Log.write("🔓 開始解鎖：\(chosen == .qr ? "QR" : "NFC")")
+        switch chosen {
         case .qr: showQRScanner = true
         case .nfc: startScan()
         }
@@ -331,6 +355,7 @@ final class AppModel {
         AlarmController.disarm(reason: "\(source) 驗證成功")
         NotificationBurst.clear()
         BedtimeReminder.reschedule()
+        unlockError = nil
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
     }
@@ -359,6 +384,7 @@ final class AppModel {
             verifySuccess(source: "QR")
         } else {
             Log.write("❌ QR 內容不符")
+            unlockError = "這不是你的起床 QR Code"
         }
     }
 
@@ -367,6 +393,7 @@ final class AppModel {
     func startScan(register: Bool = false) {
         registerMode = register
         scanning = true
+        scanStartedAt = Date()
         scanner.scan { result in
             Task { @MainActor in self.handle(result) }
         }
@@ -376,7 +403,9 @@ final class AppModel {
         scanning = false
         switch result {
         case .failure(let error):
-            Log.write("NFC 失敗：\(error.localizedDescription)")
+            let code = (error as NSError).code
+            Log.write("NFC 失敗（code \(code)）：\(error.localizedDescription)")
+            unlockError = "NFC 失敗：\(error.localizedDescription)"
             scannerDismissed()
         case .success(let uid):
             lastUID = uid
@@ -390,6 +419,7 @@ final class AppModel {
                 verifySuccess(source: "NFC 標籤 \(uid)")
             } else {
                 Log.write("❌ 標籤 \(uid) 不在白名單")
+                unlockError = "這張卡沒有登錄過"
                 scannerDismissed()
             }
         }
