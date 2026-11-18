@@ -29,6 +29,7 @@ targets:
         NFCReaderUsageDescription: 掃描你貼好的 NFC 標籤來解除鬧鐘。
         NSCameraUsageDescription: 掃描你貼好的 QR Code 來解除鬧鐘。
         NSPhotoLibraryAddUsageDescription: 把你的解鎖 QR Code 存到相簿，拿去列印。
+        NSLocationWhenInUseUsageDescription: 只在你按「天氣位置」時抓一次位置，用來查起床時的天氣。
         com.apple.developer.nfc.readersession.iso7816.select-identifiers: [D2760000850101]
         NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]

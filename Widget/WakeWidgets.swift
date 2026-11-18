@@ -209,7 +209,7 @@ struct MediumView: View {
             MainBlock(entry: entry)
             if case .ringing = entry.mode {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("只有掃 QR Code 才會停")
+                    Text("只有\(entry.state.unlockMethod.actionText)才會停")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(WakeStyle.ink)
                     Text("聲音不會自己停，走過去比較快。")
@@ -402,7 +402,7 @@ struct AlarmLiveActivity: Widget {
                         .foregroundStyle(.white)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text("只有掃 QR Code 才會停")
+                    Text("要走過去解鎖才會停")
                         .font(.caption)
                         .foregroundStyle(WakeStyle.dim)
                 }

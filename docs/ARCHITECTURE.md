@@ -43,6 +43,13 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 
 **安全底線**：小工具、即時動態、控制中心都只能看或打開 App（`wakeup://open`），不能停止、解除、延後。
 
+### 天氣
+
+- 位置：設定卡「天氣位置」用 CoreLocation 抓一次，四捨五入到小數 2 位存在 `PoCState.weatherLatitude/Longitude`（只在手機）。
+- 什麼時候抓：上膛時（背景）、鬧鐘前 30 分鐘（`refreshTick`，整晚保活所以有網路）、掃碼／感應成功、起床後打開 App 且資料超過 30 分鐘、下拉重新整理。
+- 建議：看「現在到 `weatherUntilHour`（預設 22）點」的逐小時資料。體感溫度加上體質修正（怕熱 +2）後，內層看最高、外套看最低；降雨機率 ≥ 50% 或雨量 ≥ 1 mm 要帶傘，≥ 30% 帶折疊傘。
+- 天氣只顯示資訊，上膛中卡片不顯示、設定鎖住，不影響「唯一出口」。WeatherKit 不能用（憑證沒有權限）。
+
 ### 排程的關鍵機制
 
 - `AlarmController.scheduleSequence(startIn:reason:)`：先取消全部，再排「第一顆在 +N 秒，之後每 `chainSeconds` 一顆，共 `chainCount` 顆」。預設 `chainCount = 1`。
@@ -63,6 +70,9 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `App/SleepStore.swift` | `NightRecord`、`SleepStore`（App Group 的 `nights.json`，留 60 天）、`SleepStats`（本週時數、每天長條、起床速度、連續天數） |
 | `App/BedtimeReminder.swift` | 睡前提醒：一次排未來 7 天的 `bedtime-yyyyMMdd` 單次 Time Sensitive 通知；已上膛就跳過鬧鐘前那則。回前景、上膛、重置、驗證、改設定時重排（`NotificationBurst.clear()` 會清掉全部通知，所以要在它之後重排） |
 | `App/WakeIntents.swift` | `ArmAlarmIntent`（捷徑／Siri 上膛，參數時、分；**missionPending 時拒絕**「鬧鐘進行中，不能改時間」；沒有 QR 也拒絕）、`WakeShortcuts`（片語「用起床設鬧鐘」「起床上膛」） |
+| `Shared/Weather.swift` | 天氣：`WeatherService`（Open-Meteo，不用 API key；快取在 App Group `weather.json`；同時只抓一次、間隔至少 60 秒）、`WeatherAdvice`（穿衣與帶傘規則）、`HeatTolerance`、WMO 天氣代碼對照 |
+| `App/LocationOnce.swift` | 只抓一次目前位置（設定天氣位置用），不持續定位 |
+| `App/WeatherCard.swift` | 主畫面的天氣卡（未上膛時顯示；掃碼成功後在密碼卡下面） |
 | `App/SleepView.swift` | 「睡眠」分頁（Swift Charts）。睡眠資料只在 App，不放小工具 |
 | `App/ArmedView.swift` | 上膛後蓋住整個畫面：全黑夜間畫面／響鈴畫面；`VolumeForcer`、`ScreenDimmer` |
 | `App/KeepAlive.swift` | 音訊引擎：無聲保活、警報聲播放、中斷恢復 |
@@ -82,4 +92,4 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | 鬧鐘時間 | — | AlarmKit 響＋App 警報聲；響鈴畫面亮度最高、媒體音量拉滿 |
 | 響鈴中 | 走到客廳 | 每 5 秒左右刷新 AlarmKit 鬧鐘；按停止 1 秒後重響 |
 | 按「掃描」 | 對著 QR | 全部暫停，緩衝 20 秒 |
-| 掃到 QR | 看到引導模式密碼 → 連按三下側鍵輸入 → 結束 | 全部取消、停止保活與警報聲、顯示密碼 |
+| 掃到 QR／感應 NFC | 看到引導模式密碼 → 連按三下側鍵輸入 → 結束 | 全部取消、停止保活與警報聲、顯示密碼與今天的天氣、穿衣建議 |

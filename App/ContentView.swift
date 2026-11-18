@@ -128,6 +128,10 @@ struct ContentView: View {
                         if model.state.phase == .verified, let code = model.state.guidedPasscode {
                             passcodeCard(code)
                         }
+                        // 天氣：起床掃碼後放在最上面；平常未上膛時也看得到
+                        if !model.locked && model.state.weatherLatitude != nil {
+                            WeatherCard()
+                        }
                         alarmCard
                         checklistCard
                         setupCard
@@ -143,11 +147,14 @@ struct ContentView: View {
                 }
                 .background(Color.black.ignoresSafeArea())
                 .toolbar(.hidden, for: .navigationBar)
-                .refreshable { model.refresh() }
+                .refreshable {
+                    model.refresh()
+                    model.updateWeather(reason: "手動", minInterval: 10)
+                }
                 .alert("引導使用模式密碼", isPresented: Binding(get: { shownPasscode != nil }, set: { if !$0 { shownPasscode = nil } })) {
                     Button("我已經設定好了") { shownPasscode = nil }
                 } message: {
-                    Text("\(shownPasscode ?? "")\n\n到 設定 > 輔助使用 > 引導使用模式 > 密碼設定，改成這組（Face ID 要關）。不要背它，之後要掃 QR 才看得到。")
+                    Text("\(shownPasscode ?? "")\n\n到 設定 > 輔助使用 > 引導使用模式 > 密碼設定，改成這組（Face ID 要關）。不要背它，之後解除鬧鐘才看得到。")
                 }
                 .sheet(isPresented: $model.showQRScanner, onDismiss: { model.scannerDismissed() }) {
                     QRScannerSheet()
@@ -171,7 +178,7 @@ struct ContentView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("起床").font(.system(size: 34, weight: .bold))
-                Text("走到\(model.state.scanLocation)掃 QR Code 才會停")
+                Text("走到\(model.state.scanLocation)\(model.state.unlockMethod.actionText)才會停")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -265,7 +272,7 @@ struct ContentView: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.wakeAccent)
                     .frame(width: 28)
-                Text("QR Code 貼在")
+                Text("解鎖位置")
                 Spacer()
                 TextField("客廳", text: model.binding(\.scanLocation))
                     .multilineTextAlignment(.trailing)
@@ -332,6 +339,32 @@ struct ContentView: View {
                 .padding(.vertical, 4)
                 .disabled(model.locked)
             }
+
+            Divider().padding(.leading, 40)
+
+            Button { model.setWeatherLocationFromGPS() } label: {
+                RowLabel(icon: "location.fill", title: "天氣位置",
+                         detail: model.state.weatherLatitude == nil ? "用目前位置設定" : "已設定（點一下重設）")
+            }
+            .disabled(model.locked)
+
+            HStack(spacing: 12) {
+                Image(systemName: "tshirt.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.wakeAccent)
+                    .frame(width: 28)
+                Text("穿衣體質")
+                Spacer()
+                Picker("穿衣體質", selection: Binding(
+                    get: { model.state.heatTolerance },
+                    set: { model.setHeatTolerance($0) }
+                )) {
+                    ForEach(HeatTolerance.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+            }
+            .padding(.vertical, 4)
+            .disabled(model.locked)
 
             if model.state.qrToken != nil {
                 Divider().padding(.leading, 40)
@@ -430,7 +463,7 @@ struct AdvancedView: View {
                 Button("全部取消並重置", role: .destructive) { model.resetAll() }
                     .disabled(model.locked)
             } footer: {
-                Text(model.locked ? "上膛中不能重置，只能掃 QR 解除。" : "測試時鬧鐘停不下來就按這裡。")
+                Text(model.locked ? "上膛中不能重置，只能\(model.state.unlockMethod.actionText)解除。" : "測試時鬧鐘停不下來就按這裡。")
             }
         }
         .navigationTitle("進階")

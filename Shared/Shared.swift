@@ -155,6 +155,9 @@ enum Phase: String, Codable {
 enum UnlockMethod: String, Codable {
     case qr
     case nfc
+
+    /// 畫面文字用：「掃 QR Code」「感應 NFC 卡片」
+    var actionText: String { self == .qr ? "掃 QR Code" : "感應 NFC 卡片" }
 }
 
 struct PoCState: Codable {
@@ -183,6 +186,10 @@ struct PoCState: Codable {
     var profileExpiration: Date? = nil // App 存下的憑證到期日（小工具讀不到 embedded.mobileprovision）
     var bedtimeReminderOn: Bool = true  // 睡前提醒「今晚還沒上膛」
     var bedtimeMinutes: Int = 23 * 60 + 30 // 睡前提醒時間（一天中的第幾分鐘），預設 23:30
+    var weatherLatitude: Double? = nil   // 天氣位置（只存在手機，四捨五入到小數 2 位約 1 公里）
+    var weatherLongitude: Double? = nil
+    var heatTolerance: HeatTolerance = .hot // 穿衣體質（使用者怕熱）
+    var weatherUntilHour: Int = 22          // 穿衣建議考慮到幾點
     var lastUpdated: Date = Date()
 
     init() {}
@@ -216,6 +223,10 @@ struct PoCState: Codable {
         profileExpiration = try c.decodeIfPresent(Date.self, forKey: .profileExpiration)
         bedtimeReminderOn = try c.decodeIfPresent(Bool.self, forKey: .bedtimeReminderOn) ?? d.bedtimeReminderOn
         bedtimeMinutes = try c.decodeIfPresent(Int.self, forKey: .bedtimeMinutes) ?? d.bedtimeMinutes
+        weatherLatitude = try c.decodeIfPresent(Double.self, forKey: .weatherLatitude)
+        weatherLongitude = try c.decodeIfPresent(Double.self, forKey: .weatherLongitude)
+        heatTolerance = (try? c.decodeIfPresent(HeatTolerance.self, forKey: .heatTolerance)) ?? d.heatTolerance
+        weatherUntilHour = try c.decodeIfPresent(Int.self, forKey: .weatherUntilHour) ?? d.weatherUntilHour
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }

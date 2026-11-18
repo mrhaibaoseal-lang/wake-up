@@ -50,6 +50,12 @@ final class AppModel {
     @ObservationIgnored private var refreshing = false
     var keepAliveRunning = false
 
+    // 天氣
+    var weather: WeatherReport? = WeatherService.loadCached()
+    var weatherLoading = false
+    var weatherError: String?
+    @ObservationIgnored private let locationOnce = LocationOnce()
+
     init() {
         startRefresher()
     }
@@ -108,6 +114,57 @@ final class AppModel {
         checkPendingScan()
         startPendingWatchers()
         BedtimeReminder.reschedule()
+        // 起床後打開 App：天氣超過 30 分鐘就更新
+        if !locked, (weather?.fetchedAt.timeIntervalSinceNow ?? -.infinity) < -1800 {
+            updateWeather(reason: "打開 App")
+        }
+    }
+
+    // MARK: 天氣
+
+    func updateWeather(reason: String, minInterval: TimeInterval = 60) {
+        guard state.weatherLatitude != nil, !weatherLoading else { return }
+        weatherLoading = true
+        Task {
+            if let report = await WeatherService.refresh(reason: reason, minInterval: minInterval) {
+                weather = report
+                weatherError = nil
+            } else {
+                // 跳過（剛抓過）或失敗：改用快取（上膛時在背景抓的也會在這裡讀到）
+                weather = WeatherService.loadCached() ?? weather
+                if reason == "手動" { weatherError = "沒有更新成功，顯示的是上次的資料" }
+            }
+            weatherLoading = false
+        }
+    }
+
+    /// 用目前位置當天氣位置（只抓一次）
+    func setWeatherLocationFromGPS() {
+        guard !weatherLoading else { return }
+        weatherLoading = true
+        weatherError = nil
+        Task {
+            do {
+                let location = try await locationOnce.request()
+                let lat = (location.coordinate.latitude * 100).rounded() / 100
+                let lon = (location.coordinate.longitude * 100).rounded() / 100
+                state = Store.update {
+                    $0.weatherLatitude = lat
+                    $0.weatherLongitude = lon
+                }
+                Log.write("📍 天氣位置已設定")
+                weatherLoading = false
+                updateWeather(reason: "設定位置", minInterval: 0)
+            } catch {
+                weatherError = error.localizedDescription
+                Log.write("⚠️ 定位失敗：\(error.localizedDescription)")
+                weatherLoading = false
+            }
+        }
+    }
+
+    func setHeatTolerance(_ value: HeatTolerance) {
+        state = Store.update { $0.heatTolerance = value }
     }
 
     // MARK: 睡前提醒
@@ -161,6 +218,14 @@ final class AppModel {
             Log.write(guided ? "🔒 引導使用模式：開" : "🔓 引導使用模式：關")
         }
         if state.phase != latest.phase { state = latest }
+
+        // 鬧鐘前 30 分鐘抓一次最新天氣（整晚背景保活中，網路可用）
+        if latest.phase.missionPending, let alarm = latest.alarmDate {
+            let preAlarm = alarm.addingTimeInterval(-1800)
+            if Date() >= preAlarm, (weather?.fetchedAt ?? .distantPast) < preAlarm {
+                updateWeather(reason: "鬧鐘前")
+            }
+        }
 
         guard latest.phase.missionPending, latest.refreshSeconds > 0,
               !showQRScanner, !scanning, !refreshing else {
@@ -260,6 +325,7 @@ final class AppModel {
             $0.alarmDate = Date().addingTimeInterval(seconds)
         }
         Log.write("🎯 上膛（\(source)）")
+        Task { await WeatherService.refresh(reason: "上膛") }
         SleepStore.startNight(armedAt: Date(), alarmAt: armed.alarmDate ?? Date().addingTimeInterval(seconds))
         await AlarmController.scheduleSequence(startIn: seconds, reason: "上膛")
         await BedtimeReminder.rescheduleNow()
@@ -359,6 +425,7 @@ final class AppModel {
         unlockError = nil
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
+        updateWeather(reason: "起床", minInterval: 0)
     }
 
     // MARK: QR
