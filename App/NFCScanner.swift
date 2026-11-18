@@ -21,6 +21,11 @@ final class NFCScanner: NSObject, NFCTagReaderSessionDelegate {
         session?.begin()
     }
 
+    /// 使用者在 App 裡按「取消」
+    func cancel() {
+        session?.invalidate()
+    }
+
     private func finish(_ result: Result<String, Error>) {
         guard let completion else { return }
         self.completion = nil

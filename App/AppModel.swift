@@ -14,6 +14,7 @@ final class AppModel {
     /// 最近一次解鎖失敗的原因，顯示在響鈴畫面上（成功或重新開始掃描時清掉）
     var unlockError: String?
     @ObservationIgnored private var scanStartedAt: Date?
+    @ObservationIgnored private var nfcCancelledByUser = false
 
     /// 這個方式現在能不能用來解鎖
     func canUnlock(with method: UnlockMethod) -> Bool {
@@ -405,7 +406,8 @@ final class AppModel {
         case .failure(let error):
             let code = (error as NSError).code
             Log.write("NFC 失敗（code \(code)）：\(error.localizedDescription)")
-            unlockError = "NFC 失敗：\(error.localizedDescription)"
+            unlockError = nfcCancelledByUser ? nil : "NFC 失敗：\(error.localizedDescription)"
+            nfcCancelledByUser = false
             scannerDismissed()
         case .success(let uid):
             lastUID = uid
@@ -424,6 +426,14 @@ final class AppModel {
             }
         }
         refresh()
+    }
+
+    /// 引導使用模式會把系統的 NFC 視窗藏起來（但感應仍有效），所以 App 自己提供取消
+    func cancelNFC() {
+        guard scanning else { return }
+        nfcCancelledByUser = true
+        Log.write("NFC：使用者取消")
+        scanner.cancel()
     }
 
     func removeTag(_ uid: String) {
