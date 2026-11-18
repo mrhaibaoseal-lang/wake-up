@@ -407,7 +407,7 @@ struct AdvancedView: View {
             } header: {
                 Text("解鎖方式")
             } footer: {
-                Text("NFC 標籤到貨後可以改用 NFC。左滑可刪除標籤。")
+                Text("鬧鐘響時以這裡選的方式為主，另一種有設定的話也能用來解除（響鈴畫面有「改用」按鈕）。左滑可刪除標籤。")
             }
 
             Section("狀態") {
