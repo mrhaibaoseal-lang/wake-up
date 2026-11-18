@@ -52,7 +52,7 @@ struct ArmedView: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = context.date
             let due = model.state.alarmDate.map { $0 <= now } ?? true
-            let revealed = now < revealUntil
+            let revealed = now < revealUntil || model.scanning
             ZStack {
                 Color.black.ignoresSafeArea()
                 if due {
@@ -98,7 +98,38 @@ struct ArmedView: View {
     private func icon(_ method: UnlockMethod) -> String { method == .qr ? "qrcode.viewfinder" : "wave.3.right" }
     private func action(_ method: UnlockMethod) -> String { method == .qr ? "掃描 QR Code" : "感應 NFC 卡片" }
 
+    /// 感應中的畫面：引導使用模式下系統的 NFC 視窗不會出現，但感應有效
+    private var nfcScanning: some View {
+        VStack(spacing: 22) {
+            Image(systemName: "wave.3.right")
+                .font(.system(size: 72, weight: .semibold))
+                .foregroundStyle(Color.wakeAccent)
+                .symbolEffect(.pulse)
+            Text("感應中…").font(.system(size: 40, weight: .heavy)).foregroundStyle(.white)
+            Text("把手機背面上方（相機附近）\n貼近 NFC 卡片，停一兩秒")
+                .font(.title3)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Text("聲音暫停 \(model.state.bufferSeconds) 秒，時間到還沒感應到會繼續響")
+                .font(.footnote)
+                .foregroundStyle(.gray)
+                .multilineTextAlignment(.center)
+            Button("取消") { model.cancelNFC() }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .padding(.top, 8)
+        }
+        .padding(.horizontal, 32)
+    }
+
     private var ringing: some View {
+        if model.scanning {
+            return AnyView(nfcScanning)
+        }
+        return AnyView(ringingButtons)
+    }
+
+    private var ringingButtons: some View {
         VStack(spacing: 24) {
             Text("起床！").font(.system(size: 64, weight: .heavy)).foregroundStyle(.white)
             Text("去\(model.state.scanLocation)\(primary == .qr ? "掃" : "感應")\(name(primary))才會停")
@@ -140,6 +171,13 @@ struct ArmedView: View {
     }
 
     private func waiting(now: Date) -> some View {
+        if model.scanning {
+            return AnyView(nfcScanning)
+        }
+        return AnyView(waitingInfo(now: now))
+    }
+
+    private func waitingInfo(now: Date) -> some View {
         VStack(spacing: 16) {
             Text(now, style: .time).font(.system(size: 56, weight: .light)).foregroundStyle(.white)
             if let date = model.state.alarmDate {
