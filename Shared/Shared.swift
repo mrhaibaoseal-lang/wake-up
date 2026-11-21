@@ -168,7 +168,7 @@ struct PoCState: Codable {
     var nfcWhitelist: [String] = []
     var unlockMethod: UnlockMethod = .qr
     var qrToken: String? = nil
-    var customSound: Bool = true      // 系統鬧鐘改用 App 內附的刺耳警報音
+    var alarmSound: String = AlarmSound.defaultChoice // 鬧鐘聲音：內建檔名、匯入的檔名，或 AlarmSound.systemDefault
     var keepScreenOn: Bool = true     // 上膛後禁止自動鎖定（關掉才能用引導模式的「螢幕自動鎖定」）
     var scanLocation: String = "客廳"   // QR Code 貼的位置（只用於顯示文字）
     var guidedPasscode: String? = nil  // 引導使用模式密碼：上膛中隱藏，掃碼成功後才顯示
@@ -187,6 +187,8 @@ struct PoCState: Codable {
 
     init() {}
 
+    private enum LegacyKeys: String, CodingKey { case customSound }
+
     // 新增欄位時舊資料仍可讀（缺的欄位用預設值），避免白名單被清掉
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -204,7 +206,14 @@ struct PoCState: Codable {
         guidedPasscode = try c.decodeIfPresent(String.self, forKey: .guidedPasscode)
         scanLocation = try c.decodeIfPresent(String.self, forKey: .scanLocation) ?? d.scanLocation
         keepScreenOn = try c.decodeIfPresent(Bool.self, forKey: .keepScreenOn) ?? d.keepScreenOn
-        customSound = try c.decodeIfPresent(Bool.self, forKey: .customSound) ?? d.customSound
+        if let sound = try c.decodeIfPresent(String.self, forKey: .alarmSound) {
+            alarmSound = sound
+        } else if let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+                  (try? legacy.decodeIfPresent(Bool.self, forKey: .customSound)) == false {
+            alarmSound = AlarmSound.systemDefault  // 舊版關掉「刺耳警報音」的人維持系統鈴聲
+        } else {
+            alarmSound = d.alarmSound
+        }
         chainSeconds = try c.decodeIfPresent(Int.self, forKey: .chainSeconds) ?? d.chainSeconds
         chainCount = try c.decodeIfPresent(Int.self, forKey: .chainCount) ?? d.chainCount
         sequenceGeneration = try c.decodeIfPresent(Int.self, forKey: .sequenceGeneration) ?? d.sequenceGeneration
@@ -218,6 +227,14 @@ struct PoCState: Codable {
         bedtimeMinutes = try c.decodeIfPresent(Int.self, forKey: .bedtimeMinutes) ?? d.bedtimeMinutes
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
+}
+
+/// 鬧鐘聲音的共用常數（App、Widget、Intent 都會用到）
+enum AlarmSound {
+    /// 系統預設鈴聲（AlarmKit `.default`）
+    static let systemDefault = "default"
+    /// 預設選最刺耳的內建音；也是 App 警報聲在「系統預設」或檔案遺失時的替代
+    static let defaultChoice = "wake_scream.wav"
 }
 
 enum Store {

@@ -132,6 +132,14 @@ struct ContentView: View {
                         checklistCard
                         setupCard
                         NavigationLink {
+                            SoundPickerView()
+                        } label: {
+                            RowLabel(icon: "speaker.wave.3.fill", title: "鬧鐘聲音",
+                                     detail: SoundLibrary.shared.title(for: model.state.alarmSound))
+                        }
+                        .buttonStyle(.plain)
+                        .card()
+                        NavigationLink {
                             AdvancedView()
                         } label: {
                             RowLabel(icon: "slider.horizontal.3", title: "進階設定與除錯")
@@ -364,7 +372,7 @@ struct AdvancedView: View {
 
             Section("響鈴行為") {
                 Toggle("App 警報聲（按鍵停不掉）", isOn: model.binding(\.sirenEnabled))
-                Toggle("系統鬧鐘用刺耳警報音", isOn: model.binding(\.customSound))
+                NavigationLink("鬧鐘聲音：\(SoundLibrary.shared.title(for: model.state.alarmSound))") { SoundPickerView() }
                 Stepper("按停止後 \(model.state.rearmSeconds) 秒重響",
                         value: model.binding(\.rearmSeconds), in: 1...120)
                 Stepper(model.state.refreshSeconds == 0 ? "刷新：關閉" : "響 \(model.state.refreshSeconds) 秒沒解除就換新的",

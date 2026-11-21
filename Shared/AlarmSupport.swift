@@ -12,6 +12,14 @@ struct WakeMetadata: AlarmMetadata {
     var ringingSince: Date? = nil
 }
 
+extension AlarmSound {
+    /// AlarmKit 用的聲音設定。檔名要含副檔名（只寫檔名在 iOS 26.5 實測會退回預設）；
+    /// 內建的在 App bundle，匯入的在 App 的 Library/Sounds
+    static func alertSound(for choice: String) -> AlertConfiguration.AlertSound {
+        choice == systemDefault ? .default : .named(choice)
+    }
+}
+
 enum AlarmController {
     static func ensureAuthorized() async -> Bool {
         let manager = AlarmManager.shared
@@ -88,7 +96,7 @@ enum AlarmController {
             attributes: attributes,
             stopIntent: StopAlarmIntent(alarmID: id.uuidString),
             secondaryIntent: GoScanIntent(alarmID: id.uuidString),
-            sound: Store.load().customSound ? .named("wake_alarm.wav") : .default
+            sound: AlarmSound.alertSound(for: current.alarmSound)
         )
         _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
         if log { Log.write("⏰ 排程 \(id.short) 於 \(Log.formatter.string(from: fireDate))（+\(Int(seconds))s）原因：\(reason)") }
