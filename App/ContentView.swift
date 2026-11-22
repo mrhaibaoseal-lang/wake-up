@@ -85,26 +85,39 @@ struct StatusPill: View {
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    @State private var alarmTime = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var confirmRegenerate = false
-    @State private var shownPasscode: String?
     @State private var tab = AppTab.alarm
 
-    enum AppTab: Hashable { case alarm, sleep }
+    enum AppTab: Hashable { case alarm, weather, sleep, settings }
 
     var body: some View {
+        @Bindable var model = model
         ZStack {
             TabView(selection: $tab) {
-                alarmTab
+                AlarmTab()
                     .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
                     .tabItem { Label("鬧鐘", systemImage: "alarm.fill") }
                     .tag(AppTab.alarm)
+                WeatherTab()
+                    .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
+                    .tabItem { Label("天氣", systemImage: "cloud.sun.fill") }
+                    .tag(AppTab.weather)
                 SleepView()
                     .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
                     .tabItem { Label("睡眠", systemImage: "bed.double.fill") }
                     .tag(AppTab.sleep)
+                SettingsTab()
+                    .toolbar(model.locked ? .hidden : .visible, for: .tabBar)
+                    .tabItem { Label("設定", systemImage: "gearshape.fill") }
+                    .tag(AppTab.settings)
             }
             .tint(.wakeAccent)
+            // 掃描與 QR 顯示掛在最外層：響鈴時（任何分頁）都叫得出掃描器
+            .sheet(isPresented: $model.showQRScanner, onDismiss: { model.scannerDismissed() }) {
+                QRScannerSheet()
+            }
+            .sheet(isPresented: $model.showQRCode) {
+                QRCodeSheet(token: model.state.qrToken ?? "")
+            }
 
             // 上膛／響鈴畫面蓋在分頁列之上：分頁列不能變成逃生口
             if model.locked && !model.showQRScanner {
@@ -117,83 +130,65 @@ struct ContentView: View {
         .onChange(of: model.locked, initial: true) { _, locked in
             if locked { tab = .alarm }
         }
+        // 解除成功後回到鬧鐘頁看密碼與天氣
+        .onChange(of: model.state.phase) { _, phase in
+            if phase == .verified { tab = .alarm }
+        }
+    }
+}
+
+/// 頁首：大標題＋右邊狀態
+struct PageHeader: View {
+    @Environment(AppModel.self) private var model
+    let title: String
+    let subtitle: String?
+
+    init(title: String, subtitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
     }
 
-    private var alarmTab: some View {
-        @Bindable var model = model
-        return NavigationStack {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        header
-                        if model.state.phase == .verified, let code = model.state.guidedPasscode {
-                            passcodeCard(code)
-                        }
-                        // 天氣：起床掃碼後放在最上面；平常未上膛時也看得到
-                        if !model.locked && model.state.weatherLatitude != nil {
-                            WeatherCard()
-                        }
-                        alarmCard
-                        checklistCard
-                        setupCard
-                        NavigationLink {
-                            SoundPickerView()
-                        } label: {
-                            RowLabel(icon: "speaker.wave.3.fill", title: "鬧鐘聲音",
-                                     detail: SoundLibrary.shared.title(for: model.state.alarmSound))
-                        }
-                        .buttonStyle(.plain)
-                        .card()
-                        NavigationLink {
-                            AdvancedView()
-                        } label: {
-                            RowLabel(icon: "slider.horizontal.3", title: "進階設定與除錯")
-                        }
-                        .buttonStyle(.plain)
-                        .card()
-                    }
-                    .padding(16)
-                }
-                .background(Color.black.ignoresSafeArea())
-                .toolbar(.hidden, for: .navigationBar)
-                .refreshable {
-                    model.refresh()
-                    model.updateWeather(reason: "手動", minInterval: 10)
-                }
-                .alert("引導使用模式密碼", isPresented: Binding(get: { shownPasscode != nil }, set: { if !$0 { shownPasscode = nil } })) {
-                    Button("我已經設定好了") { shownPasscode = nil }
-                } message: {
-                    Text("\(shownPasscode ?? "")\n\n到 設定 > 輔助使用 > 引導使用模式 > 密碼設定，改成這組（Face ID 要關）。不要背它，之後解除鬧鐘才看得到。")
-                }
-                .sheet(isPresented: $model.showQRScanner, onDismiss: { model.scannerDismissed() }) {
-                    QRScannerSheet()
-                }
-                .sheet(isPresented: $model.showQRCode) {
-                    QRCodeSheet(token: model.state.qrToken ?? "")
-                }
-                .confirmationDialog("重新產生後，已經印出來的 QR Code 會失效。", isPresented: $confirmRegenerate, titleVisibility: .visible) {
-                    Button("重新產生", role: .destructive) {
-                        model.generateQRToken()
-                        model.showQRCode = true
-                    }
-                }
-            }
-            .tint(.wakeAccent)
-    }
-
-    // MARK: 區塊
-
-    private var header: some View {
+    var body: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("起床").font(.system(size: 34, weight: .bold))
-                Text("走到\(model.state.scanLocation)\(model.state.unlockMethod.actionText)才會停")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(title).font(.system(size: 34, weight: .bold))
+                if let subtitle {
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             StatusPill(phase: model.state.phase)
         }
         .padding(.top, 8)
+    }
+}
+
+// MARK: - 鬧鐘分頁
+
+struct AlarmTab: View {
+    @Environment(AppModel.self) private var model
+    @State private var alarmTime = Calendar.current.date(bySettingHour: 7, minute: 0, second: 0, of: Date()) ?? Date()
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                PageHeader(title: "起床",
+                           subtitle: "走到\(model.state.scanLocation)\(model.state.unlockMethod.actionText)才會停")
+                // 早上解除後：密碼、天氣放最上面
+                if model.state.phase == .verified {
+                    if let code = model.state.guidedPasscode { passcodeCard(code) }
+                    if model.state.weatherLatitude != nil { WeatherCard() }
+                }
+                alarmCard
+                checklistCard
+            }
+            .padding(16)
+        }
+        .background(Color.black.ignoresSafeArea())
+        .refreshable {
+            model.refresh()
+            model.updateWeather(reason: "手動", minInterval: 10)
+        }
     }
 
     private func passcodeCard(_ code: String) -> some View {
@@ -237,7 +232,7 @@ struct ContentView: View {
             .disabled(model.state.qrToken == nil)
             .padding(.top, 4)
             if model.state.qrToken == nil {
-                Text("請先在下方產生或恢復 QR Code")
+                Text("請先到「設定」產生或恢復 QR Code")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -270,124 +265,48 @@ struct ContentView: View {
         }
         .card()
     }
+}
 
-    private var setupCard: some View {
+// MARK: - 天氣分頁
+
+struct WeatherTab: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                PageHeader(title: "天氣", subtitle: model.state.cwaTown.map { "\(model.state.cwaCounty ?? "")\($0)" })
+                if model.state.weatherLatitude != nil {
+                    WeatherCard()
+                } else {
+                    Text("先在下面設定天氣位置（在家按一次就好）。")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .card()
+                }
+                settingsCard
+            }
+            .padding(16)
+        }
+        .background(Color.black.ignoresSafeArea())
+        .refreshable { model.updateWeather(reason: "手動", minInterval: 10) }
+    }
+
+    private var settingsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("設定").font(.headline).padding(.bottom, 8)
-
-            HStack(spacing: 12) {
-                Image(systemName: "mappin.and.ellipse")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.wakeAccent)
-                    .frame(width: 28)
-                Text("解鎖位置")
-                Spacer()
-                TextField("客廳", text: model.binding(\.scanLocation))
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: 140)
-            }
-            .padding(.vertical, 10)
-            .disabled(model.locked)
-
-            Divider().padding(.leading, 40)
-
-            if model.state.qrToken == nil {
-                Button {
-                    model.generateQRToken()
-                    model.showQRCode = true
-                } label: { RowLabel(icon: "qrcode", title: "產生我的 QR Code") }
-                Divider().padding(.leading, 40)
-                Button { model.showQRScanner = true } label: {
-                    RowLabel(icon: "arrow.counterclockwise", title: "已經印好了？掃描恢復")
-                }
-            } else {
-                Button { model.showQRCode = true } label: { RowLabel(icon: "qrcode", title: "顯示 QR Code（列印用）") }
-                    .disabled(model.locked)
-                Divider().padding(.leading, 40)
-                Button { model.showQRScanner = true } label: { RowLabel(icon: "qrcode.viewfinder", title: "測試掃描") }
-            }
-
-            Divider().padding(.leading, 40)
-
-            Button {
-                shownPasscode = model.generateGuidedPasscode()
-            } label: {
-                RowLabel(icon: "lock.shield",
-                         title: model.state.guidedPasscode == nil ? "產生引導模式密碼" : "換一組引導模式密碼")
-            }
-            .disabled(model.locked)
-
-            Divider().padding(.leading, 40)
-
-            HStack(spacing: 12) {
-                Image(systemName: "moon.zzz.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.wakeAccent)
-                    .frame(width: 28)
-                Toggle("睡前提醒", isOn: Binding(
-                    get: { model.state.bedtimeReminderOn },
-                    set: { model.setBedtimeReminder(on: $0) }
-                ))
-            }
-            .padding(.vertical, 6)
-            .disabled(model.locked)
-
-            if model.state.bedtimeReminderOn {
-                HStack(spacing: 12) {
-                    Color.clear.frame(width: 28, height: 1)
-                    Text("提醒時間").foregroundStyle(.secondary)
-                    Spacer()
-                    DatePicker("", selection: Binding(
-                        get: { model.bedtimeDate },
-                        set: { model.setBedtime($0) }
-                    ), displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                }
-                .padding(.vertical, 4)
-                .disabled(model.locked)
-            }
-
-            Divider().padding(.leading, 40)
+            Text("天氣設定").font(.headline).padding(.bottom, 8)
 
             Button { model.setWeatherLocationFromGPS() } label: {
                 RowLabel(icon: "location.fill", title: "天氣位置",
-                         detail: model.state.weatherLatitude == nil ? "用目前位置設定"
-                            : model.state.cwaTown.map { "\(model.state.cwaCounty ?? "")\($0)（點一下重設）" } ?? "已設定（點一下重設）")
+                         detail: model.state.weatherLatitude == nil ? "用目前位置設定" : "點一下重設")
             }
-            .disabled(model.locked)
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 40)
 
             HStack(spacing: 12) {
-                Image(systemName: "speaker.wave.2.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.wakeAccent)
-                    .frame(width: 28)
-                Toggle("起床語音播報", isOn: model.binding(\.wakeSpeechOn))
-            }
-            .padding(.vertical, 6)
-            .disabled(model.locked)
-
-            HStack(spacing: 12) {
-                Image(systemName: "key.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.wakeAccent)
-                    .frame(width: 28)
-                Text("氣象署授權碼")
-                Spacer()
-                SecureField("沒填用 Open-Meteo", text: model.binding(\.cwaKey))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .multilineTextAlignment(.trailing)
-                    .onSubmit { model.updateWeather(reason: "授權碼", minInterval: 0) }
-            }
-            .padding(.vertical, 4)
-            .disabled(model.locked)
-
-            HStack(spacing: 12) {
-                Image(systemName: "tshirt.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.wakeAccent)
-                    .frame(width: 28)
+                SettingIcon("tshirt.fill")
                 Text("穿衣體質")
                 Spacer()
                 Picker("穿衣體質", selection: Binding(
@@ -399,18 +318,150 @@ struct ContentView: View {
                 .labelsHidden()
             }
             .padding(.vertical, 4)
-            .disabled(model.locked)
 
-            if model.state.qrToken != nil {
-                Divider().padding(.leading, 40)
-                Button { confirmRegenerate = true } label: {
-                    RowLabel(icon: "trash", title: "重新產生 QR Code", tint: .red)
+            Divider().padding(.leading, 40)
+
+            HStack(spacing: 12) {
+                SettingIcon("speaker.wave.2.fill")
+                Toggle("起床語音播報", isOn: model.binding(\.wakeSpeechOn))
+            }
+            .padding(.vertical, 6)
+
+            Divider().padding(.leading, 40)
+
+            HStack(spacing: 12) {
+                SettingIcon("key.fill")
+                Text("氣象署授權碼")
+                Spacer()
+                SecureField("沒填用 Open-Meteo", text: model.binding(\.cwaKey))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { model.updateWeather(reason: "授權碼", minInterval: 0) }
+            }
+            .padding(.vertical, 10)
+        }
+        .disabled(model.locked)
+        .card()
+    }
+}
+
+/// 設定列左邊的圖示
+struct SettingIcon: View {
+    let name: String
+    init(_ name: String) { self.name = name }
+    var body: some View {
+        Image(systemName: name)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(Color.wakeAccent)
+            .frame(width: 28)
+    }
+}
+
+// MARK: - 設定分頁
+
+struct SettingsTab: View {
+    @Environment(AppModel.self) private var model
+    @State private var confirmRegenerate = false
+    @State private var shownPasscode: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Picker("解鎖方式", selection: model.binding(\.unlockMethod)) {
+                        Text("QR Code").tag(UnlockMethod.qr)
+                        Text("NFC 標籤").tag(UnlockMethod.nfc)
+                    }
+                    HStack {
+                        Text("解鎖位置")
+                        Spacer()
+                        TextField("客廳", text: model.binding(\.scanLocation))
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: 160)
+                    }
+                } header: {
+                    Text("解鎖")
+                } footer: {
+                    Text("鬧鐘響時以這裡選的方式為主，另一種有設定的話也能用來解除（響鈴畫面有「改用」按鈕）。")
                 }
-                .disabled(model.locked)
+
+                Section("QR Code") {
+                    if model.state.qrToken == nil {
+                        Button("產生我的 QR Code") {
+                            model.generateQRToken()
+                            model.showQRCode = true
+                        }
+                        Button("已經印好了？掃描恢復") { model.showQRScanner = true }
+                    } else {
+                        Button("顯示 QR Code（列印用）") { model.showQRCode = true }
+                        Button("測試掃描") { model.showQRScanner = true }
+                        Button("重新產生 QR Code", role: .destructive) { confirmRegenerate = true }
+                    }
+                }
+
+                Section {
+                    Button(model.scanning ? "感應中…" : "感應 NFC 測試") { model.startScan() }
+                    Button("登錄新的 NFC 標籤") { model.startScan(register: true) }
+                    ForEach(model.state.nfcWhitelist, id: \.self) { uid in
+                        Text(uid).font(.caption.monospaced())
+                    }
+                    .onDelete { offsets in
+                        offsets.map { model.state.nfcWhitelist[$0] }.forEach(model.removeTag)
+                    }
+                } header: {
+                    Text("NFC 標籤")
+                } footer: {
+                    Text("左滑可刪除標籤。")
+                }
+
+                Section("引導使用模式") {
+                    Button(model.state.guidedPasscode == nil ? "產生引導模式密碼" : "換一組引導模式密碼") {
+                        shownPasscode = model.generateGuidedPasscode()
+                    }
+                }
+
+                Section("睡前") {
+                    Toggle("睡前提醒", isOn: Binding(
+                        get: { model.state.bedtimeReminderOn },
+                        set: { model.setBedtimeReminder(on: $0) }
+                    ))
+                    if model.state.bedtimeReminderOn {
+                        DatePicker("提醒時間", selection: Binding(
+                            get: { model.bedtimeDate },
+                            set: { model.setBedtime($0) }
+                        ), displayedComponents: .hourAndMinute)
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        SoundPickerView()
+                    } label: {
+                        LabeledContent("鬧鐘聲音", value: SoundLibrary.shared.title(for: model.state.alarmSound))
+                    }
+                    NavigationLink("進階設定與除錯") { AdvancedView() }
+                    NavigationLink("記錄") { LogView() }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle("設定")
+            .disabled(model.locked)
+            .alert("引導使用模式密碼", isPresented: Binding(get: { shownPasscode != nil }, set: { if !$0 { shownPasscode = nil } })) {
+                Button("我已經設定好了") { shownPasscode = nil }
+            } message: {
+                Text("\(shownPasscode ?? "")\n\n到 設定 > 輔助使用 > 引導使用模式 > 密碼設定，改成這組（Face ID 要關）。不要背它，之後解除鬧鐘才看得到。")
+            }
+            .confirmationDialog("重新產生後，已經印出來的 QR Code 會失效。", isPresented: $confirmRegenerate, titleVisibility: .visible) {
+                Button("重新產生", role: .destructive) {
+                    model.generateQRToken()
+                    model.showQRCode = true
+                }
             }
         }
-        .buttonStyle(.plain)
-        .card()
+        .tint(.wakeAccent)
     }
 }
 
@@ -432,7 +483,6 @@ struct AdvancedView: View {
 
             Section("響鈴行為") {
                 Toggle("App 警報聲（按鍵停不掉）", isOn: model.binding(\.sirenEnabled))
-                NavigationLink("鬧鐘聲音：\(SoundLibrary.shared.title(for: model.state.alarmSound))") { SoundPickerView() }
                 Stepper("按停止後 \(model.state.rearmSeconds) 秒重響",
                         value: model.binding(\.rearmSeconds), in: 1...120)
                 Stepper(model.state.refreshSeconds == 0 ? "刷新：關閉" : "響 \(model.state.refreshSeconds) 秒沒解除就換新的",
@@ -457,27 +507,6 @@ struct AdvancedView: View {
             }
             .disabled(model.locked)
 
-            Section {
-                Picker("解鎖方式", selection: model.binding(\.unlockMethod)) {
-                    Text("QR Code").tag(UnlockMethod.qr)
-                    Text("NFC 標籤").tag(UnlockMethod.nfc)
-                }
-                .disabled(model.locked)
-                Button(model.scanning ? "掃描中…" : "掃描 NFC 驗證") { model.startScan() }
-                Button("登錄新的 NFC 標籤") { model.startScan(register: true) }
-                    .disabled(model.locked)
-                ForEach(model.state.nfcWhitelist, id: \.self) { uid in
-                    Text(uid).font(.caption.monospaced())
-                }
-                .onDelete { offsets in
-                    offsets.map { model.state.nfcWhitelist[$0] }.forEach(model.removeTag)
-                }
-            } header: {
-                Text("解鎖方式")
-            } footer: {
-                Text("鬧鐘響時以這裡選的方式為主，另一種有設定的話也能用來解除（響鈴畫面有「改用」按鈕）。左滑可刪除標籤。")
-            }
-
             Section("狀態") {
                 LabeledContent("階段", value: model.state.phase.title)
                 LabeledContent("引導使用模式", value: model.guidedAccessOn ? "已開啟" : "未開啟")
@@ -488,10 +517,6 @@ struct AdvancedView: View {
                 LabeledContent("憑證", value: model.profileText)
                 LabeledContent("系統內鬧鐘", value: AlarmController.summary(model.alarms))
                 Button("重新整理") { model.refresh() }
-            }
-
-            Section {
-                NavigationLink("記錄") { LogView() }
             }
 
             Section {

@@ -66,7 +66,7 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `Shared/AlarmSupport.swift` | `AlarmController`（排程、取消、世代、解除）、`StopAlarmIntent`、`GoScanIntent` |
 | `App/WakeUpApp.swift` | App 入口、`AppDelegate`、前景／背景切換 |
 | `App/AppModel.swift` | 主要邏輯：上膛（`performArm` 給 App 與捷徑共用）、刷新迴圈（每 2 秒）、保活與警報聲開關、引導模式偵測、掃描緩衝、驗證、QR、NFC |
-| `App/ContentView.swift` | 底部分頁（鬧鐘／睡眠）、主畫面（卡片式）、進階設定 `AdvancedView`、記錄 `LogView`。上膛中 `ArmedView` 蓋在分頁列之上、分頁列隱藏並切回鬧鐘頁 |
+| `App/ContentView.swift` | 底部分頁：鬧鐘 `AlarmTab`（上膛、睡前檢查；解除後顯示密碼＋天氣）、天氣 `WeatherTab`（天氣卡＋天氣設定）、睡眠、設定 `SettingsTab`（解鎖方式、QR、NFC、引導模式密碼、睡前提醒、鬧鐘聲音、進階 `AdvancedView`、記錄 `LogView`）。QR 掃描與顯示的 sheet 掛在最外層。上膛中 `ArmedView` 蓋在分頁列之上、分頁列隱藏並切回鬧鐘頁 |
 | `App/SleepStore.swift` | `NightRecord`、`SleepStore`（App Group 的 `nights.json`，留 60 天）、`SleepStats`（本週時數、每天長條、起床速度、連續天數） |
 | `App/BedtimeReminder.swift` | 睡前提醒：一次排未來 7 天的 `bedtime-yyyyMMdd` 單次 Time Sensitive 通知；已上膛就跳過鬧鐘前那則。回前景、上膛、重置、驗證、改設定時重排（`NotificationBurst.clear()` 會清掉全部通知，所以要在它之後重排） |
 | `App/WakeIntents.swift` | `ArmAlarmIntent`（捷徑／Siri 上膛，參數時、分；**missionPending 時拒絕**「鬧鐘進行中，不能改時間」；沒有 QR 也拒絕）、`WakeShortcuts`（片語「用起床設鬧鐘」「起床上膛」） |
