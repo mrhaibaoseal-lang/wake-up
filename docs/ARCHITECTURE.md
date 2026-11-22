@@ -73,6 +73,7 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `Shared/CWAWeather.swift` | 中央氣象署鄉鎮預報：依天氣位置找最近鄉鎮（F-D0047-093，5 次請求，結果存在 `cwaDataset/cwaCounty/cwaTown`），再抓該縣市資料集；氣象署天氣代碼轉 WMO |
 | `Shared/Weather.swift` | 天氣：`WeatherService`（有授權碼先用氣象署，失敗或沒填改用 Open-Meteo；快取在 App Group `weather.json`；同時只抓一次、間隔至少 60 秒）、`WeatherAdvice`（穿衣與帶傘規則）、`HeatTolerance`、WMO 天氣代碼對照 |
 | `App/LocationOnce.swift` | 只抓一次目前位置（設定天氣位置用），不持續定位 |
+| `App/WakeSpeech.swift` | 解鎖成功後的語音播報（AVSpeechSynthesizer，zh-TW 最高品質的聲音，.playback 不受靜音鍵影響） |
 | `App/WeatherCard.swift` | 主畫面的天氣卡（未上膛時顯示；掃碼成功後在密碼卡下面） |
 | `App/SleepView.swift` | 「睡眠」分頁（Swift Charts）。睡眠資料只在 App，不放小工具 |
 | `App/ArmedView.swift` | 上膛後蓋住整個畫面：全黑夜間畫面／響鈴畫面；`VolumeForcer`、`ScreenDimmer` |

@@ -358,6 +358,16 @@ struct ContentView: View {
             .disabled(model.locked)
 
             HStack(spacing: 12) {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.wakeAccent)
+                    .frame(width: 28)
+                Toggle("起床語音播報", isOn: model.binding(\.wakeSpeechOn))
+            }
+            .padding(.vertical, 6)
+            .disabled(model.locked)
+
+            HStack(spacing: 12) {
                 Image(systemName: "key.fill")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.wakeAccent)

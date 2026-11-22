@@ -430,6 +430,22 @@ final class AppModel {
         Log.write("✅ \(source) 驗證成功，鬧鐘解除")
         refresh()
         updateWeather(reason: "起床", minInterval: 0)
+        if state.wakeSpeechOn {
+            Task {
+                // 等警報聲停乾淨、最新天氣抓完（最多約 5 秒，抓不到就用鬧鐘前那份）
+                try? await Task.sleep(for: .seconds(1))
+                for _ in 0..<20 where weatherLoading {
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                speakWeather()
+            }
+        }
+    }
+
+    /// 唸一段很短的天氣（解鎖成功後自動、或按天氣卡上的喇叭）
+    func speakWeather() {
+        WakeSpeech.shared.speak(WakeSpeech.text(report: weather, untilHour: state.weatherUntilHour,
+                                                tolerance: state.heatTolerance))
     }
 
     // MARK: QR
