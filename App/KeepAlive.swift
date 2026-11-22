@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioToolbox
 
 /// 上膛期間在背景播放無聲音軌，讓 App 整晚保持執行；
 /// 鬧鐘時間到之後，由 App 自己播警報聲（實體按鍵只能停掉 AlarmKit 的聲音，停不掉這個）。
@@ -14,6 +15,8 @@ final class KeepAlive {
     private var wanted = false
     private(set) var sirenOn = false
     private var lastFailureLog = Date.distantPast
+    private var vibrator: Task<Void, Never>?
+    private var sirenCache: (choice: String, buffer: AVAudioPCMBuffer)?
 
     var running: Bool { wanted && engine.isRunning }
 
@@ -40,6 +43,7 @@ final class KeepAlive {
         wanted = false
         sirenOn = false
         siren.stop()
+        setVibration(false)
         silence.stop()
         engine.stop()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -84,19 +88,39 @@ final class KeepAlive {
             Log.write("🚨 App 警報聲停止")
             siren.stop()
         }
+        setVibration(on)
     }
 
-    private lazy var sirenBuffer: AVAudioPCMBuffer = loadSirenFile() ?? makeBuffer(siren: true)
+    /// 警報聲響的時候一起連續震動（App 在前景時最有效，引導使用模式下 App 一直在前景）
+    private func setVibration(_ on: Bool) {
+        vibrator?.cancel()
+        vibrator = nil
+        guard on else { return }
+        vibrator = Task {
+            while !Task.isCancelled {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                try? await Task.sleep(for: .milliseconds(900))
+            }
+        }
+    }
+
+    /// 跟系統鬧鐘用同一個音檔（設定裡選的那個）；讀不到就用程式產生的方波
+    private func sirenBuffer() -> AVAudioPCMBuffer {
+        let choice = Store.load().alarmSound
+        if let cache = sirenCache, cache.choice == choice { return cache.buffer }
+        let buffer = loadSirenFile(choice) ?? makeBuffer(siren: true)
+        sirenCache = (choice, buffer)
+        return buffer
+    }
 
     private func playSiren() {
         siren.stop()
-        siren.scheduleBuffer(sirenBuffer, at: nil, options: .loops)
+        siren.scheduleBuffer(sirenBuffer(), at: nil, options: .loops)
         siren.play()
     }
 
-    /// 跟系統鬧鐘用同一個警報音檔；讀不到就用程式產生的方波
-    private func loadSirenFile() -> AVAudioPCMBuffer? {
-        guard let url = Bundle.main.url(forResource: "wake_alarm", withExtension: "wav"),
+    private func loadSirenFile(_ choice: String) -> AVAudioPCMBuffer? {
+        guard let url = SoundLibrary.fileURL(for: choice),
               let file = try? AVAudioFile(forReading: url),
               file.processingFormat.sampleRate == format.sampleRate,
               file.processingFormat.channelCount == format.channelCount,

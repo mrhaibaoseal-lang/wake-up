@@ -75,11 +75,13 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `App/WeatherCard.swift` | 主畫面的天氣卡（未上膛時顯示；掃碼成功後在密碼卡下面） |
 | `App/SleepView.swift` | 「睡眠」分頁（Swift Charts）。睡眠資料只在 App，不放小工具 |
 | `App/ArmedView.swift` | 上膛後蓋住整個畫面：全黑夜間畫面／響鈴畫面；`VolumeForcer`、`ScreenDimmer` |
-| `App/KeepAlive.swift` | 音訊引擎：無聲保活、警報聲播放、中斷恢復 |
+| `App/KeepAlive.swift` | 音訊引擎：無聲保活、警報聲播放（讀 `PoCState.alarmSound` 選的檔案）、響鈴時連續震動、中斷恢復 |
 | `App/QRSupport.swift` | 產生 QR 圖片、VisionKit 掃描器、QR 顯示頁 |
 | `App/NFCScanner.swift` | 讀 NFC 標籤 UID |
 | `App/TerminationGuard.swift` | App 被滑掉時的備援（實測效果有限）、通知連發 |
-| `App/Sounds/wake_alarm.wav` | 程式合成的刺耳警報音（AlarmKit 與 App 警報聲共用） |
+| `App/Sounds/*.wav` | 內建鬧鐘音（AlarmKit 與 App 警報聲共用）。`wake_scream`／`wake_chaos`／`wake_klaxon` 由 `tools/make_sounds.py` 產生；`wake_alarm` 是舊版 |
+| `App/SoundLibrary.swift` | 內建音清單、匯入（檔案／網址 → 44.1 kHz 單聲道 CAF、截 29 秒、正規化，存 `Library/Sounds`，名稱存 `Library/custom_sounds.json`）、試聽 |
+| `App/SoundPickerView.swift` | 「鬧鐘聲音」頁：選擇、試聽、匯入、改名、刪除 |
 | `App/Assets.xcassets` | App 圖示 |
 | `Shared/OpenAppIntent.swift` | `OpenWakeAppIntent`：只打開 App（控制中心按鈕用，App 與 Widget 都編進去） |
 | `Widget/WakeWidgets.swift` | 小工具 `StatusWidget`（黑／橘，未上膛／已上膛／響鈴中／今天起床了；小、中、鎖屏三種）、AlarmKit 即時動態與動態島、控制中心按鈕 `WakeControl` |
