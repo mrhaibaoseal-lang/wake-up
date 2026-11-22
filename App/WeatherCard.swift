@@ -12,7 +12,7 @@ struct WeatherCard: View {
                 if model.weatherLoading {
                     ProgressView()
                 } else if let report = model.weather {
-                    Text("更新於 \(report.fetchedAt.formatted(date: .omitted, time: .shortened))")
+                    Text("\(report.source ?? "Open-Meteo") · 更新於 \(report.fetchedAt.formatted(date: .omitted, time: .shortened))")
                         .font(.caption)
                         .foregroundStyle(report.fetchedAt.timeIntervalSinceNow < -3 * 3600 ? .orange : .secondary)
                 }

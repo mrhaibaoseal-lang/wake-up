@@ -352,8 +352,25 @@ struct ContentView: View {
 
             Button { model.setWeatherLocationFromGPS() } label: {
                 RowLabel(icon: "location.fill", title: "天氣位置",
-                         detail: model.state.weatherLatitude == nil ? "用目前位置設定" : "已設定（點一下重設）")
+                         detail: model.state.weatherLatitude == nil ? "用目前位置設定"
+                            : model.state.cwaTown.map { "\(model.state.cwaCounty ?? "")\($0)（點一下重設）" } ?? "已設定（點一下重設）")
             }
+            .disabled(model.locked)
+
+            HStack(spacing: 12) {
+                Image(systemName: "key.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.wakeAccent)
+                    .frame(width: 28)
+                Text("氣象署授權碼")
+                Spacer()
+                SecureField("沒填用 Open-Meteo", text: model.binding(\.cwaKey))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { model.updateWeather(reason: "授權碼", minInterval: 0) }
+            }
+            .padding(.vertical, 4)
             .disabled(model.locked)
 
             HStack(spacing: 12) {

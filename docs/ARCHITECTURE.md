@@ -70,7 +70,8 @@ idle ──上膛──▶ armed ──打開掃描──▶ buffer ──掃到
 | `App/SleepStore.swift` | `NightRecord`、`SleepStore`（App Group 的 `nights.json`，留 60 天）、`SleepStats`（本週時數、每天長條、起床速度、連續天數） |
 | `App/BedtimeReminder.swift` | 睡前提醒：一次排未來 7 天的 `bedtime-yyyyMMdd` 單次 Time Sensitive 通知；已上膛就跳過鬧鐘前那則。回前景、上膛、重置、驗證、改設定時重排（`NotificationBurst.clear()` 會清掉全部通知，所以要在它之後重排） |
 | `App/WakeIntents.swift` | `ArmAlarmIntent`（捷徑／Siri 上膛，參數時、分；**missionPending 時拒絕**「鬧鐘進行中，不能改時間」；沒有 QR 也拒絕）、`WakeShortcuts`（片語「用起床設鬧鐘」「起床上膛」） |
-| `Shared/Weather.swift` | 天氣：`WeatherService`（Open-Meteo，不用 API key；快取在 App Group `weather.json`；同時只抓一次、間隔至少 60 秒）、`WeatherAdvice`（穿衣與帶傘規則）、`HeatTolerance`、WMO 天氣代碼對照 |
+| `Shared/CWAWeather.swift` | 中央氣象署鄉鎮預報：依天氣位置找最近鄉鎮（F-D0047-093，5 次請求，結果存在 `cwaDataset/cwaCounty/cwaTown`），再抓該縣市資料集；氣象署天氣代碼轉 WMO |
+| `Shared/Weather.swift` | 天氣：`WeatherService`（有授權碼先用氣象署，失敗或沒填改用 Open-Meteo；快取在 App Group `weather.json`；同時只抓一次、間隔至少 60 秒）、`WeatherAdvice`（穿衣與帶傘規則）、`HeatTolerance`、WMO 天氣代碼對照 |
 | `App/LocationOnce.swift` | 只抓一次目前位置（設定天氣位置用），不持續定位 |
 | `App/WeatherCard.swift` | 主畫面的天氣卡（未上膛時顯示；掃碼成功後在密碼卡下面） |
 | `App/SleepView.swift` | 「睡眠」分頁（Swift Charts）。睡眠資料只在 App，不放小工具 |

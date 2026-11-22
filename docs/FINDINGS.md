@@ -63,3 +63,10 @@
 - [AlarmKit only triggers a short vibration when the screen is on（808260）](https://developer.apple.com/forums/thread/808260)
 - [Is there any way to control alarm volume independently when using AlarmKit?（813519）](https://developer.apple.com/forums/thread/813519)
 - [Use Guided Access on iPhone or iPad（Apple Support）](https://support.apple.com/en-us/ht202612)
+
+## 中央氣象署開放資料（2026-11 實測）
+
+- 鄉鎮未來 3 天預報：每縣市一份 `F-D0047-001`～`085`（間隔 4），用 `LocationName=大安區` 篩鄉鎮、`ElementName=溫度,體感溫度,...` 篩欄位（逗號分隔可用）。
+- 溫度、體感溫度每小時一筆（`DataTime`）；風速每 3 小時（m/s）；`3小時降雨機率`、`天氣現象` 是區間（`StartTime`/`EndTime`）。值全部是字串。沒有雨量、沒有即時觀測。
+- `F-D0047-093` 可一次查多個縣市資料集，但**一次最多 5 個** `locationId`；回傳每個鄉鎮的 `Latitude`/`Longitude`，`Dataid` 是 `D0047-061`（少了 `F-`）。全台 368 個鄉鎮。
+- 授權碼錯誤回 HTTP 401 `Authorization key is not correct.`

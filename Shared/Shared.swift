@@ -190,6 +190,10 @@ struct PoCState: Codable {
     var weatherLongitude: Double? = nil
     var heatTolerance: HeatTolerance = .hot // 穿衣體質（使用者怕熱）
     var weatherUntilHour: Int = 22          // 穿衣建議考慮到幾點
+    var cwaKey: String = ""                 // 中央氣象署開放資料授權碼（只存在手機，不能進 repo）
+    var cwaDataset: String? = nil           // 依天氣位置找到的縣市資料集，例如 F-D0047-061
+    var cwaCounty: String? = nil            // 例如 臺北市
+    var cwaTown: String? = nil              // 例如 大安區
     var lastUpdated: Date = Date()
 
     init() {}
@@ -236,6 +240,10 @@ struct PoCState: Codable {
         weatherLongitude = try c.decodeIfPresent(Double.self, forKey: .weatherLongitude)
         heatTolerance = (try? c.decodeIfPresent(HeatTolerance.self, forKey: .heatTolerance)) ?? d.heatTolerance
         weatherUntilHour = try c.decodeIfPresent(Int.self, forKey: .weatherUntilHour) ?? d.weatherUntilHour
+        cwaKey = try c.decodeIfPresent(String.self, forKey: .cwaKey) ?? d.cwaKey
+        cwaDataset = try c.decodeIfPresent(String.self, forKey: .cwaDataset)
+        cwaCounty = try c.decodeIfPresent(String.self, forKey: .cwaCounty)
+        cwaTown = try c.decodeIfPresent(String.self, forKey: .cwaTown)
         lastUpdated = try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? d.lastUpdated
     }
 }

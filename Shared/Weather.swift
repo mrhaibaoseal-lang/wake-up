@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - 天氣：Open-Meteo（免費、不用 API key），結果存在 App Group 的 weather.json
+// MARK: - 天氣：有授權碼用中央氣象署鄉鎮預報，否則（或失敗時）用 Open-Meteo。結果存在 App Group 的 weather.json
 
 /// 穿衣體質：加到體感溫度上再查表。怕熱的人覺得比較熱，所以 +2。
 enum HeatTolerance: String, Codable, CaseIterable {
@@ -43,6 +43,8 @@ struct WeatherReport: Codable {
     var currentRain: Double
     var currentWind: Double
     var hours: [WeatherHour]
+    var source: String? = nil   // 「中央氣象署」或「Open-Meteo」（舊快取沒有這欄）
+    var place: String? = nil    // 例如「臺北市大安區」
 }
 
 /// WMO 天氣代碼 → SF Symbol 與中文
@@ -92,13 +94,25 @@ enum WeatherService {
         guard let lat = state.weatherLatitude, let lon = state.weatherLongitude else { return nil }
         guard await gate.begin(minInterval: minInterval) else { return nil }
         var result: WeatherReport?
-        do {
-            let report = try await fetch(latitude: lat, longitude: lon)
+        let key = state.cwaKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !key.isEmpty {
+            do {
+                let report = try await CWAWeather.fetch(key: key, latitude: lat, longitude: lon)
+                result = report
+            } catch {
+                Log.write("⚠️ 氣象署失敗（\(reason)），改用 Open-Meteo：\(CWAWeather.describe(error))")
+            }
+        }
+        if result == nil {
+            do {
+                result = try await fetch(latitude: lat, longitude: lon)
+            } catch {
+                Log.write("⚠️ 天氣更新失敗（\(reason)）：\(error.localizedDescription)")
+            }
+        }
+        if let report = result {
             save(report)
-            Log.write("🌤 天氣更新（\(reason)）：\(Int(report.currentTemp.rounded()))° 體感 \(Int(report.currentFeels.rounded()))° \(WeatherCode.describe(report.currentCode).text)")
-            result = report
-        } catch {
-            Log.write("⚠️ 天氣更新失敗（\(reason)）：\(error.localizedDescription)")
+            Log.write("🌤 天氣更新（\(reason)，\(report.source ?? "Open-Meteo")\(report.place.map { " " + $0 } ?? "")）：\(Int(report.currentTemp.rounded()))° 體感 \(Int(report.currentFeels.rounded()))° \(WeatherCode.describe(report.currentCode).text)")
         }
         await gate.end()
         return result
@@ -148,7 +162,8 @@ enum WeatherService {
             currentCode: cur.weather_code ?? firstHour?.code ?? 0,
             currentRain: cur.precipitation ?? 0,
             currentWind: cur.wind_speed_10m ?? 0,
-            hours: hours
+            hours: hours,
+            source: "Open-Meteo"
         )
     }
 }

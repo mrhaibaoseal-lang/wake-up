@@ -127,6 +127,7 @@ final class AppModel {
         weatherLoading = true
         Task {
             if let report = await WeatherService.refresh(reason: reason, minInterval: minInterval) {
+                state = Store.load()   // 氣象署鄉鎮可能剛找到
                 weather = report
                 weatherError = nil
             } else {
@@ -151,6 +152,9 @@ final class AppModel {
                 state = Store.update {
                     $0.weatherLatitude = lat
                     $0.weatherLongitude = lon
+                    $0.cwaDataset = nil   // 位置換了，氣象署鄉鎮要重新找
+                    $0.cwaCounty = nil
+                    $0.cwaTown = nil
                 }
                 Log.write("📍 天氣位置已設定")
                 weatherLoading = false
